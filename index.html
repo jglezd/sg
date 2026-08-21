@@ -237,7 +237,7 @@
   <button class="btn secondary" id="exportar">Exportar datos (copiar)</button>
   <button class="btn secondary" id="borrarTodo" style="color:var(--bad); border-color:var(--bad);">Borrar todos los datos</button>
 
-  <footer>Datos almacenados localmente en este navegador · sin servidor</footer>
+  <footer>Datos almacenados localmente en este navegador · sin servidor<br>v2026-08-21.2</footer>
 </div>
 
 <script>
@@ -421,6 +421,21 @@
       alert('Indica al menos la fecha.');
       return;
     }
+
+    var existente = loadDiario().find(function(d){ return d.fecha === fecha; });
+    if(existente && existente.cerrada){
+      var semanaAfectada = loadSemanas().find(function(s){
+        return fecha >= s.weekStart && fecha <= s.weekEnd;
+      });
+      var rango = semanaAfectada ? (fmtDate(semanaAfectada.weekStart) + '–' + fmtDate(semanaAfectada.weekEnd)) : 'una semana ya cerrada';
+      var seguir = confirm(
+        'Este día (' + fmtDate(fecha) + ') ya forma parte de la semana cerrada ' + rango + '.\n\n' +
+        'Si continúas, quedará marcado como pendiente y NO se reflejará en esa media ya calculada. Podrías tener que cerrar de nuevo esa semana manualmente si quieres que el cambio se refleje.\n\n' +
+        '¿Seguro que quieres continuar?'
+      );
+      if(!seguir) return;
+    }
+
     var pesoRaw = parseFloat(document.getElementById('peso').value);
     var peso = isNaN(pesoRaw) ? null : pesoRaw;
     var pasosVal = parseFloat(document.getElementById('pasos').value) || null;
