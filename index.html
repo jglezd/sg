@@ -167,21 +167,21 @@
     <div class="hint" style="margin-top:-4px; margin-bottom:8px;">Usa la primera serie de trabajo de cada ejercicio. Se calcula el 1RM estimado automáticamente para comparar semanas con distinto peso/reps.</div>
 
     <div class="ex-block">
-      <div class="ex-name">Leg Press</div>
+      <div class="ex-name">Leg Press <span class="hint" style="display:inline;">(LP)</span></div>
       <div class="ex-inputs">
         <input type="number" id="legpress_kg" step="0.5" placeholder="kg">
         <input type="number" id="legpress_reps" step="1" placeholder="reps">
       </div>
     </div>
     <div class="ex-block">
-      <div class="ex-name">Pull-Up (peso añadido)</div>
+      <div class="ex-name">Pull-Up (peso añadido) <span class="hint" style="display:inline;">(PU)</span></div>
       <div class="ex-inputs">
         <input type="number" id="pullup_kg" step="0.5" placeholder="kg">
         <input type="number" id="pullup_reps" step="1" placeholder="reps">
       </div>
     </div>
     <div class="ex-block">
-      <div class="ex-name">Bench Press</div>
+      <div class="ex-name">Bench Press <span class="hint" style="display:inline;">(BP)</span></div>
       <div class="ex-inputs">
         <input type="number" id="bench_kg" step="0.5" placeholder="kg">
         <input type="number" id="bench_reps" step="1" placeholder="reps">
@@ -492,12 +492,22 @@
       suenoMedia: avg(suenos)
     };
 
+    var exLines = [];
+    var exLabels = { legpress: 'Leg Press', pullup: 'Pull-Up', bench: 'Bench Press' };
+    exIds.forEach(function(id){
+      var rm = snapshot[id+'_1rm'];
+      if(rm != null){
+        exLines.push(exLabels[id] + ' 1RM est.: ' + rm.toFixed(1) + ' kg (' + snapshot[id+'_kg'] + '×' + snapshot[id+'_reps'] + ')');
+      }
+    });
+    var exText = exLines.length ? exLines.join('\n') + '\n' : 'Sin ejercicios de referencia registrados esta semana.\n';
+
     var confirmMsg = 'Cerrar semana ' + fmtDate(weekStart) + ' - ' + fmtDate(weekEnd) + '\n' +
       'Peso medio: ' + (snapshot.pesoMedio ? snapshot.pesoMedio.toFixed(1) : '—') + ' kg (' + snapshot.diasPeso + ' días)\n' +
       'Pasos medios: ' + (snapshot.pasosMedia ? Math.round(snapshot.pasosMedia) : '—') + ' (' + snapshot.diasPasos + ' días)\n' +
       'Kcal media: ' + (snapshot.kcalMedia ? Math.round(snapshot.kcalMedia) : '—') + ' (' + snapshot.diasKcal + '/' + snapshot.diasTotal + ' días)\n' +
       'Proteína media: ' + (snapshot.proteinaMedia ? Math.round(snapshot.proteinaMedia) : '—') + ' g\n' +
-      'Leg Press 1RM est.: ' + (snapshot.legpress_1rm ? snapshot.legpress_1rm.toFixed(1) : '—') + ' kg\n' +
+      exText +
       '¿Confirmas el cierre?';
     if(!confirm(confirmMsg)) return;
 
@@ -551,20 +561,29 @@
     if(abiertos.length === 0){
       semEl.innerHTML = '<div class="empty">Sin días registrados todavía esta semana.</div>';
     } else {
+      var exAbbr = { legpress: 'LP', pullup: 'PU', bench: 'BP' };
       var rows = abiertos.map(function(d){
         var kcalCell = d.libre ? '<span class="tag-libre">libre</span>' : (d.kcal != null ? d.kcal : '—');
         var fuerzaBits = [];
         exIds.forEach(function(id){
           if(d[id+'_kg'] != null){
-            fuerzaBits.push(d[id+'_kg'] + 'x' + (d[id+'_reps']||'?'));
+            fuerzaBits.push(exAbbr[id] + ' ' + d[id+'_kg'] + '×' + (d[id+'_reps']||'?'));
           }
         });
+        var fuerzaCell;
+        if(fuerzaBits.length){
+          fuerzaCell = fuerzaBits.join('<br>');
+        } else if(d.entrenado){
+          fuerzaCell = '<span class="tag-libre">ENTR</span>';
+        } else {
+          fuerzaCell = '—';
+        }
         var balCell = d.balance != null ? (d.balance >= 0 ? '+' : '') + Math.round(d.balance) : '—';
         return '<tr>' +
           '<td>' + fmtDate(d.fecha) + '</td>' +
           '<td>' + (d.peso ?? '—') + '</td>' +
           '<td>' + (d.pasos ?? '—') + '</td>' +
-          '<td>' + (fuerzaBits.length ? fuerzaBits.join(' ') : '—') + '</td>' +
+          '<td>' + fuerzaCell + '</td>' +
           '<td>' + kcalCell + '</td>' +
           '<td>' + balCell + '</td>' +
           '<td><span class="del" data-fecha="' + d.fecha + '">✕</span></td>' +
