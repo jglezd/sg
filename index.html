@@ -288,20 +288,36 @@
     return edad;
   }
 
-  function calcularBMR(peso){
-    var edad = edadDesde(config.fnac);
-    var altura = config.altura;
+  function calcularBMR(peso, edadFija, alturaFija){
+    var edad = edadFija != null ? edadFija : edadDesde(config.fnac);
+    var altura = alturaFija != null ? alturaFija : config.altura;
     if(peso == null || edad == null || !altura) return null;
     return 10*peso + 6.25*altura - 5*edad + 5;
   }
 
-  function calcularBalance(peso, pasos, kcalIngeridas, entrenado){
-    var bmr = calcularBMR(peso);
+  function calcularBalance(peso, pasos, kcalIngeridas, entrenado, edadFija, alturaFija){
+    var bmr = calcularBMR(peso, edadFija, alturaFija);
     if(bmr == null || kcalIngeridas == null) return null;
     var gastoPasos = (pasos || 0) * 0.045;
     var bonusEntreno = entrenado ? 250 : 0;
     var gastoTotal = bmr + gastoPasos + bonusEntreno;
     return kcalIngeridas - gastoTotal; // positivo = superávit, negativo = déficit
+  }
+
+  function calcularDesglose(peso, pasos, kcalIngeridas, entrenado, edadFija, alturaFija){
+    var edad = edadFija != null ? edadFija : edadDesde(config.fnac);
+    var altura = alturaFija != null ? alturaFija : config.altura;
+    var bmr = calcularBMR(peso, edad, altura);
+    if(bmr == null || kcalIngeridas == null) return null;
+    var gastoPasos = (pasos || 0) * 0.045;
+    var bonusEntreno = entrenado ? 250 : 0;
+    var gastoTotal = bmr + gastoPasos + bonusEntreno;
+    return {
+      peso: peso, edad: edad, altura: altura,
+      bmr: bmr, gastoPasos: gastoPasos, bonusEntreno: bonusEntreno,
+      gastoTotal: gastoTotal, kcal: kcalIngeridas,
+      balance: kcalIngeridas - gastoTotal
+    };
   }
 
   function epley1RM(kg, reps){
@@ -410,6 +426,8 @@
     var pasosVal = parseFloat(document.getElementById('pasos').value) || null;
     var kcalVal = esLibre ? null : (parseFloat(kcalInput.value) || null);
 
+    var edadRegistro = edadDesde(config.fnac);
+    var alturaRegistro = config.altura;
     var entry = {
       fecha: fecha,
       peso: peso,
@@ -418,7 +436,9 @@
       proteina: esLibre ? null : (parseFloat(proteinaInput.value) || null),
       libre: esLibre,
       entrenado: esEntrenado,
-      balance: calcularBalance(peso, pasosVal || 0, kcalVal, esEntrenado),
+      edadRegistro: edadRegistro,
+      alturaRegistro: alturaRegistro,
+      balance: calcularBalance(peso, pasosVal || 0, kcalVal, esEntrenado, edadRegistro, alturaRegistro),
       energia: energiaVal,
       sueno: suenoVal,
       cerrada: false
@@ -565,7 +585,7 @@
       semEl.innerHTML = '<div class="empty">Sin días registrados todavía esta semana.</div>';
     } else {
       var exAbbr = { legpress: 'LP', pullup: 'PU', bench: 'BP' };
-      var rows = abiertos.map(function(d){
+      var rows = abiertos.map(function(d, idx){
         var kcalCell = d.libre ? '<span class="tag-libre">libre</span>' : (d.kcal != null ? d.kcal : '—');
         var fuerzaBits = [];
         exIds.forEach(function(id){
@@ -581,8 +601,14 @@
         } else {
           fuerzaCell = '—';
         }
+
+        var clicable = d.balance != null;
         var balCell = d.balance != null ? (d.balance >= 0 ? '+' : '') + Math.round(d.balance) : '—';
-        return '<tr>' +
+        if(clicable){
+          balCell = '<span class="bal-toggle" data-target="bal-detail-' + idx + '" style="cursor:pointer;text-decoration:underline dotted;">' + balCell + '</span>';
+        }
+
+        var mainRow = '<tr>' +
           '<td>' + fmtDate(d.fecha) + '</td>' +
           '<td>' + (d.peso ?? '—') + '</td>' +
           '<td>' + (d.pasos ?? '—') + '</td>' +
@@ -591,8 +617,34 @@
           '<td>' + balCell + '</td>' +
           '<td><span class="del" data-fecha="' + d.fecha + '">✕</span></td>' +
           '</tr>';
+
+        var detailRow = '';
+        if(clicable){
+          var desglose = calcularDesglose(d.peso, d.pasos || 0, d.kcal, d.entrenado, d.edadRegistro, d.alturaRegistro);
+          var signoBal = desglose.balance >= 0 ? '+' : '';
+          var detailHtml = '<div style="background:var(--panel-2);border-radius:9px;margin:6px 0 8px;padding:10px 12px;font-size:12px;">' +
+            '<div style="color:var(--muted);margin-bottom:6px;">BMR (' + desglose.peso + ' kg, ' + desglose.altura + ' cm, ' + desglose.edad + ' años)</div>' +
+            '<div style="display:grid;grid-template-columns:1fr auto;gap:4px 10px;font-family:var(--mono);">' +
+              '<div style="color:var(--muted);">BMR</div><div style="text-align:right;">' + Math.round(desglose.bmr) + ' kcal</div>' +
+              '<div style="color:var(--muted);">+ Pasos</div><div style="text-align:right;">' + Math.round(desglose.gastoPasos) + ' kcal</div>' +
+              '<div style="color:var(--muted);">+ Entreno</div><div style="text-align:right;">' + desglose.bonusEntreno + ' kcal</div>' +
+              '<div style="color:var(--muted);border-top:1px solid var(--line);padding-top:4px;">= Gasto estimado</div><div style="text-align:right;border-top:1px solid var(--line);padding-top:4px;">' + Math.round(desglose.gastoTotal) + ' kcal</div>' +
+              '<div style="color:var(--muted);">− Kcal ingeridas</div><div style="text-align:right;">' + Math.round(desglose.kcal) + ' kcal</div>' +
+              '<div style="font-weight:600;border-top:1px solid var(--line);padding-top:4px;">= Balance</div><div style="text-align:right;font-weight:600;border-top:1px solid var(--line);padding-top:4px;">' + signoBal + Math.round(desglose.balance) + ' kcal</div>' +
+            '</div></div>';
+          detailRow = '<tr id="bal-detail-' + idx + '" style="display:none;"><td colspan="7" style="padding:0;">' + detailHtml + '</td></tr>';
+        }
+
+        return mainRow + detailRow;
       }).join('');
       semEl.innerHTML = '<table><thead><tr><th>Día</th><th>Peso</th><th>Pasos</th><th>Fuerza</th><th>Kcal</th><th>Bal.</th><th></th></tr></thead><tbody>' + rows + '</tbody></table>';
+
+      semEl.querySelectorAll('.bal-toggle').forEach(function(el){
+        el.addEventListener('click', function(){
+          var target = document.getElementById(el.getAttribute('data-target'));
+          target.style.display = target.style.display === 'none' ? 'table-row' : 'none';
+        });
+      });
       semEl.querySelectorAll('.del').forEach(function(el){
         el.addEventListener('click', function(){
           var f = el.getAttribute('data-fecha');
@@ -760,6 +812,20 @@
       bannersEl.innerHTML = '<div class="banner neutral">Cierra al menos dos semanas para ver comparativas y avisos automáticos.</div>';
     }
   }
+
+  function migrarRegistrosAntiguos(){
+    var data = loadDiario();
+    var cambiado = false;
+    data.forEach(function(d){
+      if(d.balance != null && d.edadRegistro == null){
+        d.edadRegistro = edadDesde(config.fnac);
+        d.alturaRegistro = config.altura;
+        cambiado = true;
+      }
+    });
+    if(cambiado) saveDiario(data);
+  }
+  migrarRegistrosAntiguos();
 
   render();
 })();
