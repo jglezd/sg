@@ -401,11 +401,12 @@
 
   document.getElementById('guardar').addEventListener('click', function(){
     var fecha = document.getElementById('fecha').value;
-    var peso = parseFloat(document.getElementById('peso').value);
-    if(!fecha || isNaN(peso)){
-      alert('Indica al menos fecha y peso de hoy.');
+    if(!fecha){
+      alert('Indica al menos la fecha.');
       return;
     }
+    var pesoRaw = parseFloat(document.getElementById('peso').value);
+    var peso = isNaN(pesoRaw) ? null : pesoRaw;
     var pasosVal = parseFloat(document.getElementById('pasos').value) || null;
     var kcalVal = esLibre ? null : (parseFloat(kcalInput.value) || null);
 
