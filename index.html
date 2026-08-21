@@ -1,0 +1,553 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Bitácora · Déficit</title>
+<style>
+  :root{
+    --bg: #0d0f12;
+    --panel: #16191e;
+    --panel-2: #1c2027;
+    --line: #262b33;
+    --text: #eceef1;
+    --muted: #8a919c;
+    --accent: #4f8ef7;
+    --accent-dim: #2c4a86;
+    --good: #4caf7d;
+    --warn: #e2a23b;
+    --bad: #e2593b;
+    --mono: 'SF Mono', 'Menlo', 'Consolas', monospace;
+  }
+  *{box-sizing:border-box;}
+  html,body{
+    margin:0; padding:0; background:var(--bg); color:var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif;
+    -webkit-font-smoothing:antialiased;
+    min-height:100vh;
+  }
+  .wrap{ max-width:520px; margin:0 auto; padding:env(safe-area-inset-top,0) 16px 40px;}
+  header{ padding:28px 4px 18px; border-bottom:1px solid var(--line); margin-bottom:20px;}
+  .eyebrow{ font-family:var(--mono); font-size:11px; letter-spacing:.14em; text-transform:uppercase; color:var(--accent); margin:0 0 6px;}
+  h1{ font-size:26px; font-weight:700; margin:0 0 4px; letter-spacing:-0.01em;}
+  .sub{ color:var(--muted); font-size:13px; margin:0;}
+
+  .card{ background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:18px; margin-bottom:16px;}
+  .card h2{ font-size:13px; text-transform:uppercase; letter-spacing:.08em; color:var(--muted); margin:0 0 14px; font-weight:600; display:flex; justify-content:space-between; align-items:center;}
+  .card h2 .count{ font-family:var(--mono); color:var(--accent); text-transform:none; letter-spacing:0; font-size:12px;}
+
+  label{ display:block; font-size:13px; color:var(--muted); margin:14px 0 6px;}
+  label:first-of-type{ margin-top:0;}
+  input[type=number], input[type=date]{
+    width:100%; background:var(--panel-2); border:1px solid var(--line); color:var(--text);
+    padding:11px 12px; border-radius:9px; font-size:16px; font-family:var(--mono);
+  }
+  input:focus{ outline:none; border-color:var(--accent);}
+  input:disabled{ opacity:.35; }
+  .row2{ display:grid; grid-template-columns:1fr 1fr; gap:12px;}
+  .row3{ display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px;}
+
+  .ex-block{ margin-top:12px; padding-top:12px; border-top:1px dashed var(--line);}
+  .ex-block:first-of-type{ border-top:none; padding-top:0; margin-top:0; }
+  .ex-name{ font-size:13px; font-weight:600; margin-bottom:8px; }
+  .ex-inputs{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .ex-inputs input{ font-size:15px; padding:9px 10px; }
+  .ex-inputs .ph{ font-size:11px; color:var(--muted); margin-top:3px; }
+
+  .scale{ display:flex; gap:6px; margin-top:6px;}
+  .scale button{
+    flex:1; background:var(--panel-2); border:1px solid var(--line); color:var(--muted);
+    padding:9px 0; border-radius:8px; font-family:var(--mono); font-size:14px;
+  }
+  .scale button.sel{ background:var(--accent-dim); border-color:var(--accent); color:var(--text);}
+
+  .toggle-row{
+    display:flex; align-items:center; justify-content:space-between;
+    background:var(--panel-2); border:1px solid var(--line); border-radius:9px;
+    padding:11px 12px; margin-top:14px;
+  }
+  .toggle-row span{ font-size:14px; }
+  .switch{
+    width:42px; height:24px; background:var(--line); border-radius:999px; position:relative; flex-shrink:0;
+    border:none; padding:0;
+  }
+  .switch::after{
+    content:''; position:absolute; top:2px; left:2px; width:20px; height:20px; border-radius:50%;
+    background:var(--muted); transition:transform .15s, background .15s;
+  }
+  .switch.on{ background:var(--accent-dim); }
+  .switch.on::after{ transform:translateX(18px); background:var(--accent); }
+
+  .hint{ font-size:11.5px; color:var(--muted); margin-top:6px; line-height:1.4;}
+
+  .btn{
+    display:block; width:100%; background:var(--accent); color:#fff; border:none;
+    padding:14px; border-radius:10px; font-size:15px; font-weight:600; margin-top:18px;
+  }
+  .btn:active{ opacity:.85; }
+  .btn.secondary{ background:transparent; border:1px solid var(--line); color:var(--muted); font-weight:500;}
+  .btn.close{ background:var(--good); }
+
+  .status{ font-size:13px; color:var(--good); margin-top:10px; display:none; text-align:center;}
+
+  .metric{ display:flex; justify-content:space-between; align-items:baseline; padding:10px 0; border-bottom:1px solid var(--line);}
+  .metric:last-child{ border-bottom:none;}
+  .metric .label{ font-size:13px; color:var(--muted);}
+  .metric .value{ font-family:var(--mono); font-size:15px;}
+  .value.good{ color:var(--good);}
+  .value.warn{ color:var(--warn);}
+  .value.bad{ color:var(--bad);}
+
+  .banner{ border-radius:10px; padding:12px 14px; font-size:13px; line-height:1.5; margin-bottom:16px; border:1px solid var(--line);}
+  .banner.good{ background:rgba(76,175,125,.08); border-color:rgba(76,175,125,.35); color:var(--good);}
+  .banner.warn{ background:rgba(226,162,59,.08); border-color:rgba(226,162,59,.35); color:var(--warn);}
+  .banner.bad{ background:rgba(226,89,59,.08); border-color:rgba(226,89,59,.35); color:var(--bad);}
+  .banner.neutral{ color:var(--muted);}
+
+  table{ width:100%; border-collapse:collapse; font-size:12.5px;}
+  th,td{ text-align:right; padding:8px 4px; border-bottom:1px solid var(--line); font-family:var(--mono);}
+  th:first-child, td:first-child{ text-align:left; font-family:inherit; color:var(--muted);}
+  th{ color:var(--muted); font-weight:500; font-size:11px; text-transform:uppercase; letter-spacing:.04em;}
+  tbody tr:last-child td{ border-bottom:none;}
+  .del{ color:var(--bad); font-family:var(--mono); font-size:16px; padding:0 4px;}
+  .tag-libre{ color:var(--warn); font-family:inherit; }
+
+  .empty{ color:var(--muted); font-size:13px; text-align:center; padding:20px 0;}
+  .ratio{ color:var(--muted); font-size:11px; }
+
+  footer{ text-align:center; color:var(--muted); font-size:11px; margin-top:24px; font-family:var(--mono);}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <p class="eyebrow">Fase · Déficit</p>
+    <h1>Bitácora diaria</h1>
+    <p class="sub">Registra peso y pasos cada día. Añade los ejercicios de referencia (kg + reps) y la comida solo si ese día toca. Cierra la semana cuando quieras para guardar el resumen.</p>
+  </header>
+
+  <div id="banners"></div>
+
+  <div class="card">
+    <h2>Registro de hoy</h2>
+
+    <label for="fecha">Fecha</label>
+    <input type="date" id="fecha">
+
+    <div class="row2">
+      <div>
+        <label for="peso">Peso (kg)</label>
+        <input type="number" id="peso" step="0.1" placeholder="ej. 72.4">
+      </div>
+      <div>
+        <label for="pasos">Pasos</label>
+        <input type="number" id="pasos" step="100" placeholder="ej. 10000">
+      </div>
+    </div>
+
+    <label style="margin-top:18px;">Ejercicios de referencia — solo si hoy tocaba</label>
+    <div class="hint" style="margin-top:-4px; margin-bottom:8px;">Usa la primera serie de trabajo de cada ejercicio. Se calcula el 1RM estimado automáticamente para comparar semanas con distinto peso/reps.</div>
+
+    <div class="ex-block">
+      <div class="ex-name">Leg Press</div>
+      <div class="ex-inputs">
+        <input type="number" id="legpress_kg" step="0.5" placeholder="kg">
+        <input type="number" id="legpress_reps" step="1" placeholder="reps">
+      </div>
+    </div>
+    <div class="ex-block">
+      <div class="ex-name">Pull-Up (peso añadido)</div>
+      <div class="ex-inputs">
+        <input type="number" id="pullup_kg" step="0.5" placeholder="kg">
+        <input type="number" id="pullup_reps" step="1" placeholder="reps">
+      </div>
+    </div>
+    <div class="ex-block">
+      <div class="ex-name">Bench Press</div>
+      <div class="ex-inputs">
+        <input type="number" id="bench_kg" step="0.5" placeholder="kg">
+        <input type="number" id="bench_reps" step="1" placeholder="reps">
+      </div>
+    </div>
+
+    <label>Alimentación</label>
+    <div class="row2">
+      <input type="number" id="kcal" step="10" placeholder="kcal">
+      <input type="number" id="proteina" step="1" placeholder="Proteína g">
+    </div>
+    <div class="toggle-row">
+      <span>Día libre / sin registrar comida</span>
+      <button type="button" class="switch" id="libreSwitch"></button>
+    </div>
+    <p class="hint">Marca "día libre" si te saltaste el registro a propósito. Se excluye de la media igual que un día olvidado, pero queda identificado en el historial.</p>
+
+    <label>Energía general (1-5)</label>
+    <div class="scale" id="energia"></div>
+
+    <label>Calidad de sueño (1-5)</label>
+    <div class="scale" id="sueno"></div>
+
+    <button class="btn" id="guardar">Guardar día</button>
+    <p class="status" id="status">Guardado ✓</p>
+  </div>
+
+  <div class="card">
+    <h2>Semana en curso <span class="count" id="diasAbiertos"></span></h2>
+    <div id="semanaActual"></div>
+    <button class="btn close" id="cerrarSemana">Cerrar semana</button>
+    <p class="hint">Calcula la media de peso/pasos/kcal/proteína de los días registrados, toma el 1RM estimado más reciente de cada ejercicio, y guarda el resumen en el historial semanal.</p>
+  </div>
+
+  <div class="card" id="resumenCard" style="display:none;">
+    <h2>Comparativa · última vs anterior semana cerrada</h2>
+    <div id="metrics"></div>
+  </div>
+
+  <div class="card">
+    <h2>Historial semanal</h2>
+    <div id="historial"></div>
+  </div>
+
+  <button class="btn secondary" id="exportar">Exportar datos (copiar)</button>
+
+  <footer>Datos almacenados localmente en este navegador · sin servidor</footer>
+</div>
+
+<script>
+(function(){
+  var DIARIO_KEY = 'bitacora_diario_v3';
+  var SEMANAS_KEY = 'bitacora_semanas_v3';
+  var energiaVal = null, suenoVal = null, esLibre = false;
+
+  function loadDiario(){ try{ return JSON.parse(localStorage.getItem(DIARIO_KEY)) || []; }catch(e){ return []; } }
+  function saveDiario(list){ localStorage.setItem(DIARIO_KEY, JSON.stringify(list)); }
+  function loadSemanas(){ try{ return JSON.parse(localStorage.getItem(SEMANAS_KEY)) || []; }catch(e){ return []; } }
+  function saveSemanas(list){ localStorage.setItem(SEMANAS_KEY, JSON.stringify(list)); }
+
+  function epley1RM(kg, reps){
+    if(kg == null || reps == null || isNaN(kg) || isNaN(reps) || reps <= 0) return null;
+    return kg * (1 + reps/30);
+  }
+
+  function buildScale(containerId, setter){
+    var el = document.getElementById(containerId);
+    for(var i=1;i<=5;i++){
+      (function(n){
+        var b = document.createElement('button');
+        b.type = 'button'; b.textContent = n;
+        b.addEventListener('click', function(){
+          setter(n);
+          Array.prototype.forEach.call(el.children, function(c){ c.classList.remove('sel'); });
+          b.classList.add('sel');
+        });
+        el.appendChild(b);
+      })(i);
+    }
+  }
+  buildScale('energia', function(v){ energiaVal = v; });
+  buildScale('sueno', function(v){ suenoVal = v; });
+
+  var libreBtn = document.getElementById('libreSwitch');
+  var kcalInput = document.getElementById('kcal');
+  var proteinaInput = document.getElementById('proteina');
+  libreBtn.addEventListener('click', function(){
+    esLibre = !esLibre;
+    libreBtn.classList.toggle('on', esLibre);
+    kcalInput.disabled = esLibre;
+    proteinaInput.disabled = esLibre;
+    if(esLibre){ kcalInput.value=''; proteinaInput.value=''; }
+  });
+
+  document.getElementById('fecha').valueAsDate = new Date();
+
+  var exIds = ['legpress','pullup','bench'];
+
+  function resetForm(){
+    document.getElementById('peso').value='';
+    document.getElementById('pasos').value='';
+    exIds.forEach(function(id){
+      document.getElementById(id+'_kg').value='';
+      document.getElementById(id+'_reps').value='';
+    });
+    kcalInput.value=''; proteinaInput.value='';
+    esLibre = false; libreBtn.classList.remove('on');
+    kcalInput.disabled = false; proteinaInput.disabled = false;
+    energiaVal = null; suenoVal = null;
+    document.querySelectorAll('#energia button, #sueno button').forEach(function(b){ b.classList.remove('sel'); });
+  }
+
+  document.getElementById('guardar').addEventListener('click', function(){
+    var fecha = document.getElementById('fecha').value;
+    var peso = parseFloat(document.getElementById('peso').value);
+    if(!fecha || isNaN(peso)){
+      alert('Indica al menos fecha y peso de hoy.');
+      return;
+    }
+    var entry = {
+      fecha: fecha,
+      peso: peso,
+      pasos: parseFloat(document.getElementById('pasos').value) || null,
+      kcal: esLibre ? null : (parseFloat(kcalInput.value) || null),
+      proteina: esLibre ? null : (parseFloat(proteinaInput.value) || null),
+      libre: esLibre,
+      energia: energiaVal,
+      sueno: suenoVal,
+      cerrada: false
+    };
+    exIds.forEach(function(id){
+      var kg = parseFloat(document.getElementById(id+'_kg').value);
+      var reps = parseFloat(document.getElementById(id+'_reps').value);
+      kg = isNaN(kg) ? null : kg;
+      reps = isNaN(reps) ? null : reps;
+      entry[id+'_kg'] = kg;
+      entry[id+'_reps'] = reps;
+      entry[id+'_1rm'] = epley1RM(kg, reps);
+    });
+
+    var data = loadDiario();
+    data = data.filter(function(d){ return d.fecha !== fecha; });
+    data.push(entry);
+    data.sort(function(a,b){ return new Date(a.fecha) - new Date(b.fecha); });
+    saveDiario(data);
+
+    resetForm();
+    var status = document.getElementById('status');
+    status.style.display = 'block';
+    setTimeout(function(){ status.style.display='none'; }, 1600);
+
+    render();
+  });
+
+  document.getElementById('cerrarSemana').addEventListener('click', function(){
+    var data = loadDiario();
+    var abiertos = data.filter(function(d){ return !d.cerrada; });
+    if(abiertos.length === 0){
+      alert('No hay días pendientes de cerrar.');
+      return;
+    }
+    var fechas = abiertos.map(function(d){ return d.fecha; }).sort();
+    var weekStart = fechas[0], weekEnd = fechas[fechas.length-1];
+
+    function avg(arr){ return arr.length ? (arr.reduce(function(a,b){return a+b;},0)/arr.length) : null; }
+    function lastVal(key){
+      var withVal = abiertos.filter(function(d){ return d[key] != null; });
+      if(withVal.length === 0) return null;
+      withVal.sort(function(a,b){ return new Date(a.fecha) - new Date(b.fecha); });
+      return withVal[withVal.length-1][key];
+    }
+
+    var pesos = abiertos.filter(function(d){return d.peso!=null;}).map(function(d){return d.peso;});
+    var pasos = abiertos.filter(function(d){return d.pasos!=null;}).map(function(d){return d.pasos;});
+    var kcals = abiertos.filter(function(d){return d.kcal!=null;}).map(function(d){return d.kcal;});
+    var proteinas = abiertos.filter(function(d){return d.proteina!=null;}).map(function(d){return d.proteina;});
+    var energias = abiertos.filter(function(d){return d.energia!=null;}).map(function(d){return d.energia;});
+    var suenos = abiertos.filter(function(d){return d.sueno!=null;}).map(function(d){return d.sueno;});
+    var diasLibres = abiertos.filter(function(d){return d.libre;}).length;
+
+    var snapshot = {
+      weekStart: weekStart, weekEnd: weekEnd,
+      pesoMedio: avg(pesos), diasPeso: pesos.length,
+      pasosMedia: avg(pasos), diasPasos: pasos.length,
+      kcalMedia: avg(kcals), diasKcal: kcals.length,
+      proteinaMedia: avg(proteinas), diasProteina: proteinas.length,
+      diasLibres: diasLibres,
+      diasTotal: abiertos.length,
+      legpress_1rm: lastVal('legpress_1rm'),
+      legpress_kg: lastVal('legpress_kg'), legpress_reps: lastVal('legpress_reps'),
+      pullup_1rm: lastVal('pullup_1rm'),
+      pullup_kg: lastVal('pullup_kg'), pullup_reps: lastVal('pullup_reps'),
+      bench_1rm: lastVal('bench_1rm'),
+      bench_kg: lastVal('bench_kg'), bench_reps: lastVal('bench_reps'),
+      energiaMedia: avg(energias),
+      suenoMedia: avg(suenos)
+    };
+
+    var confirmMsg = 'Cerrar semana ' + fmtDate(weekStart) + ' - ' + fmtDate(weekEnd) + '\n' +
+      'Peso medio: ' + (snapshot.pesoMedio ? snapshot.pesoMedio.toFixed(1) : '—') + ' kg (' + snapshot.diasPeso + ' días)\n' +
+      'Pasos medios: ' + (snapshot.pasosMedia ? Math.round(snapshot.pasosMedia) : '—') + ' (' + snapshot.diasPasos + ' días)\n' +
+      'Kcal media: ' + (snapshot.kcalMedia ? Math.round(snapshot.kcalMedia) : '—') + ' (' + snapshot.diasKcal + '/' + snapshot.diasTotal + ' días)\n' +
+      'Proteína media: ' + (snapshot.proteinaMedia ? Math.round(snapshot.proteinaMedia) : '—') + ' g\n' +
+      'Leg Press 1RM est.: ' + (snapshot.legpress_1rm ? snapshot.legpress_1rm.toFixed(1) : '—') + ' kg\n' +
+      '¿Confirmas el cierre?';
+    if(!confirm(confirmMsg)) return;
+
+    var semanas = loadSemanas();
+    semanas.push(snapshot);
+    saveSemanas(semanas);
+
+    data.forEach(function(d){ if(!d.cerrada) d.cerrada = true; });
+    saveDiario(data);
+
+    render();
+  });
+
+  document.getElementById('exportar').addEventListener('click', function(){
+    var payload = { diario: loadDiario(), semanas: loadSemanas() };
+    var text = JSON.stringify(payload, null, 2);
+    if(navigator.clipboard){
+      navigator.clipboard.writeText(text).then(function(){
+        alert('Datos copiados al portapapeles.');
+      }).catch(function(){ prompt('Copia manualmente:', text); });
+    } else {
+      prompt('Copia manualmente:', text);
+    }
+  });
+
+  function fmtDate(d){
+    var parts = d.split('-');
+    return parts[2] + '/' + parts[1];
+  }
+
+  function render(){
+    var diario = loadDiario();
+    var semanas = loadSemanas();
+    var abiertos = diario.filter(function(d){ return !d.cerrada; }).sort(function(a,b){ return new Date(a.fecha)-new Date(b.fecha); });
+
+    document.getElementById('diasAbiertos').textContent = abiertos.length + ' día' + (abiertos.length===1?'':'s');
+
+    var semEl = document.getElementById('semanaActual');
+    if(abiertos.length === 0){
+      semEl.innerHTML = '<div class="empty">Sin días registrados todavía esta semana.</div>';
+    } else {
+      var rows = abiertos.map(function(d){
+        var kcalCell = d.libre ? '<span class="tag-libre">libre</span>' : (d.kcal != null ? d.kcal : '—');
+        var fuerzaBits = [];
+        exIds.forEach(function(id){
+          if(d[id+'_kg'] != null){
+            fuerzaBits.push(d[id+'_kg'] + 'x' + (d[id+'_reps']||'?'));
+          }
+        });
+        return '<tr>' +
+          '<td>' + fmtDate(d.fecha) + '</td>' +
+          '<td>' + (d.peso ?? '—') + '</td>' +
+          '<td>' + (d.pasos ?? '—') + '</td>' +
+          '<td>' + (fuerzaBits.length ? fuerzaBits.join(' ') : '—') + '</td>' +
+          '<td>' + kcalCell + '</td>' +
+          '<td><span class="del" data-fecha="' + d.fecha + '">✕</span></td>' +
+          '</tr>';
+      }).join('');
+      semEl.innerHTML = '<table><thead><tr><th>Día</th><th>Peso</th><th>Pasos</th><th>Fuerza</th><th>Kcal</th><th></th></tr></thead><tbody>' + rows + '</tbody></table>';
+      semEl.querySelectorAll('.del').forEach(function(el){
+        el.addEventListener('click', function(){
+          var f = el.getAttribute('data-fecha');
+          var d2 = loadDiario().filter(function(x){ return x.fecha !== f; });
+          saveDiario(d2);
+          render();
+        });
+      });
+    }
+
+    var histEl = document.getElementById('historial');
+    var bannersEl = document.getElementById('banners');
+    var resumenCard = document.getElementById('resumenCard');
+    var metricsEl = document.getElementById('metrics');
+    bannersEl.innerHTML = '';
+    metricsEl.innerHTML = '';
+
+    if(semanas.length === 0){
+      histEl.innerHTML = '<div class="empty">Aún no has cerrado ninguna semana.</div>';
+      resumenCard.style.display = 'none';
+      return;
+    }
+
+    var rows2 = semanas.slice().reverse().map(function(s, idx){
+      var i = semanas.length - 1 - idx;
+      return '<tr>' +
+        '<td>' + fmtDate(s.weekStart) + '–' + fmtDate(s.weekEnd) + '</td>' +
+        '<td>' + (s.pesoMedio!=null ? s.pesoMedio.toFixed(1) : '—') + '</td>' +
+        '<td>' + (s.pasosMedia!=null ? Math.round(s.pasosMedia) : '—') + '</td>' +
+        '<td>' + (s.kcalMedia!=null ? Math.round(s.kcalMedia) : '—') + '<span class="ratio"> ' + s.diasKcal + '/' + s.diasTotal + '</span></td>' +
+        '<td>' + (s.legpress_1rm!=null ? s.legpress_1rm.toFixed(1) : '—') + '</td>' +
+        '<td><span class="del" data-idx="' + i + '">✕</span></td>' +
+        '</tr>';
+    }).join('');
+    histEl.innerHTML = '<table><thead><tr><th>Semana</th><th>Peso</th><th>Pasos</th><th>Kcal</th><th>Leg Pr. 1RM</th><th></th></tr></thead><tbody>' + rows2 + '</tbody></table>';
+    histEl.querySelectorAll('.del').forEach(function(el){
+      el.addEventListener('click', function(){
+        if(!confirm('¿Eliminar esta semana cerrada del historial? (los registros diarios no se borran)')) return;
+        var idx = parseInt(el.getAttribute('data-idx'), 10);
+        var s2 = loadSemanas();
+        s2.splice(idx, 1);
+        saveSemanas(s2);
+        render();
+      });
+    });
+
+    if(semanas.length >= 2){
+      var last = semanas[semanas.length-1];
+      var prev = semanas[semanas.length-2];
+      resumenCard.style.display = 'block';
+
+      function metricRow(label, cur, prevVal, unit, extra, decimals){
+        decimals = decimals == null ? 1 : decimals;
+        if(cur == null || prevVal == null){
+          return '<div class="metric"><span class="label">' + label + '</span><span class="value">—</span></div>';
+        }
+        var diff = cur - prevVal;
+        var cls = diff === 0 ? 'warn' : (diff < 0 ? 'bad' : 'good');
+        var sign = diff > 0 ? '+' : '';
+        return '<div class="metric"><span class="label">' + label + '</span>' +
+          '<span class="value ' + cls + '">' + cur.toFixed(decimals) + unit + ' (' + sign + diff.toFixed(decimals) + ')' + (extra||'') + '</span></div>';
+      }
+
+      metricsEl.innerHTML =
+        metricRow('Peso', last.pesoMedio, prev.pesoMedio, ' kg') +
+        metricRow('Pasos medios', last.pasosMedia, prev.pasosMedia, '', '', 0) +
+        metricRow('Kcal media', last.kcalMedia, prev.kcalMedia, '', ' <span class="ratio">(' + last.diasKcal + '/' + last.diasTotal + 'd)</span>', 0) +
+        metricRow('Proteína media', last.proteinaMedia, prev.proteinaMedia, ' g', '', 0) +
+        metricRow('Leg Press 1RM', last.legpress_1rm, prev.legpress_1rm, ' kg') +
+        metricRow('Pull-Up 1RM', last.pullup_1rm, prev.pullup_1rm, ' kg') +
+        metricRow('Bench 1RM', last.bench_1rm, prev.bench_1rm, ' kg') +
+        metricRow('Energía', last.energiaMedia, prev.energiaMedia, '/5') +
+        metricRow('Sueño', last.suenoMedia, prev.suenoMedia, '/5');
+
+      var banners = [];
+
+      if(last.pesoMedio != null && prev.pesoMedio != null){
+        var wdiff = last.pesoMedio - prev.pesoMedio;
+        if(wdiff > -0.2){
+          banners.push('<div class="banner warn">Casi sin cambio de peso esta semana (' + wdiff.toFixed(1) + ' kg). El déficit real podría ser menor de lo estimado.</div>');
+        } else if(wdiff < -0.9){
+          banners.push('<div class="banner bad">Bajada de ' + Math.abs(wdiff).toFixed(1) + ' kg — más rápido de lo recomendable. Considera subir ~150-200 kcal para proteger el músculo.</div>');
+        } else {
+          banners.push('<div class="banner good">Ritmo de pérdida saludable (' + wdiff.toFixed(1) + ' kg). El déficit parece bien calibrado.</div>');
+        }
+      }
+
+      if(last.pasosMedia != null && prev.pasosMedia != null){
+        var pdiff = last.pasosMedia - prev.pasosMedia;
+        if(Math.abs(pdiff) > 2000){
+          banners.push('<div class="banner neutral">Los pasos medios cambiaron bastante respecto a la semana anterior (' + (pdiff>0?'+':'') + Math.round(pdiff) + '). Puede explicar parte del cambio de peso, más allá de la comida.</div>');
+        }
+      }
+
+      if(last.diasKcal < last.diasTotal){
+        banners.push('<div class="banner neutral">Solo registraste comida ' + last.diasKcal + ' de ' + last.diasTotal + ' días esta semana — ten en cuenta que la media de kcal puede no reflejar los días libres.</div>');
+      }
+
+      if(last.proteinaMedia != null && last.proteinaMedia < 140){
+        banners.push('<div class="banner warn">Proteína media (' + Math.round(last.proteinaMedia) + ' g) por debajo de tu objetivo (140-160 g). Intenta subirla la próxima semana.</div>');
+      }
+
+      var strengthKeys = ['legpress_1rm','pullup_1rm','bench_1rm'];
+      var drops = 0, total = 0;
+      strengthKeys.forEach(function(k){
+        if(last[k] != null && prev[k] != null){ total++; if(last[k] < prev[k]) drops++; }
+      });
+      if(total > 0 && drops === total){
+        banners.push('<div class="banner bad">El 1RM estimado bajó en los tres ejercicios de referencia esta semana. Vigílalo — si se repite, el déficit puede ser demasiado agresivo.</div>');
+      }
+
+      bannersEl.innerHTML = banners.join('');
+    } else {
+      resumenCard.style.display = 'none';
+      bannersEl.innerHTML = '<div class="banner neutral">Cierra al menos dos semanas para ver comparativas y avisos automáticos.</div>';
+    }
+  }
+
+  render();
+})();
+</script>
+</body>
+</html>
