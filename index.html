@@ -471,6 +471,7 @@
     var energias = abiertos.filter(function(d){return d.energia!=null;}).map(function(d){return d.energia;});
     var suenos = abiertos.filter(function(d){return d.sueno!=null;}).map(function(d){return d.sueno;});
     var diasLibres = abiertos.filter(function(d){return d.libre;}).length;
+    var diasEntrenado = abiertos.filter(function(d){return d.entrenado;}).length;
     var balances = abiertos.filter(function(d){return d.balance!=null;}).map(function(d){return d.balance;});
 
     var snapshot = {
@@ -481,6 +482,7 @@
       proteinaMedia: avg(proteinas), diasProteina: proteinas.length,
       balanceMedio: avg(balances), diasBalance: balances.length,
       diasLibres: diasLibres,
+      diasEntrenado: diasEntrenado,
       diasTotal: abiertos.length,
       legpress_1rm: lastVal('legpress_1rm'),
       legpress_kg: lastVal('legpress_kg'), legpress_reps: lastVal('legpress_reps'),
@@ -613,20 +615,60 @@
       return;
     }
 
+    var exLabel2 = { legpress: 'LP', pullup: 'PU', bench: 'BP' };
     var rows2 = semanas.slice().reverse().map(function(s, idx){
       var i = semanas.length - 1 - idx;
-      return '<tr>' +
+      var balCell = s.balanceMedio != null
+        ? '<span class="' + (s.balanceMedio >= 0 ? 'value warn' : 'value good') + '" style="font-family:inherit;font-size:inherit;">' + (s.balanceMedio >= 0 ? '+' : '') + Math.round(s.balanceMedio) + '</span>'
+        : '—';
+
+      var detailBits = [];
+      detailBits.push(['Pasos medios', s.pasosMedia!=null ? Math.round(s.pasosMedia) : '—']);
+      detailBits.push(['Kcal (días)', (s.kcalMedia!=null ? Math.round(s.kcalMedia) : '—') + ' (' + s.diasKcal + '/' + s.diasTotal + ')']);
+      detailBits.push(['Proteína', s.proteinaMedia!=null ? Math.round(s.proteinaMedia) + ' g' : '—']);
+      exIds.forEach(function(id){
+        if(s[id+'_1rm'] != null){
+          detailBits.push([exLabel2[id] + ' 1RM', s[id+'_1rm'].toFixed(1) + ' kg (' + s[id+'_kg'] + '×' + s[id+'_reps'] + ')']);
+        }
+      });
+      if(s.energiaMedia != null || s.suenoMedia != null){
+        detailBits.push(['Energía / Sueño', (s.energiaMedia!=null?s.energiaMedia.toFixed(1):'—') + ' / ' + (s.suenoMedia!=null?s.suenoMedia.toFixed(1):'—')]);
+      }
+      if(s.diasLibres > 0){
+        detailBits.push(['Días libres', s.diasLibres]);
+      }
+
+      var detailHtml = '<div style="background:var(--panel-2);border-radius:9px;margin:6px 0 8px;padding:10px 12px;display:grid;grid-template-columns:1fr 1fr;gap:6px 14px;font-size:12px;">' +
+        detailBits.map(function(b){
+          return '<div style="color:var(--muted);">' + b[0] + '</div><div style="text-align:right;font-family:var(--mono);">' + b[1] + '</div>';
+        }).join('') + '</div>';
+
+      return '<tr class="hist-row" data-target="detail-' + i + '" style="cursor:pointer;">' +
         '<td>' + fmtDate(s.weekStart) + '–' + fmtDate(s.weekEnd) + '</td>' +
         '<td>' + (s.pesoMedio!=null ? s.pesoMedio.toFixed(1) : '—') + '</td>' +
-        '<td>' + (s.pasosMedia!=null ? Math.round(s.pasosMedia) : '—') + '</td>' +
-        '<td>' + (s.kcalMedia!=null ? Math.round(s.kcalMedia) : '—') + '<span class="ratio"> ' + s.diasKcal + '/' + s.diasTotal + '</span></td>' +
-        '<td>' + (s.legpress_1rm!=null ? s.legpress_1rm.toFixed(1) : '—') + '</td>' +
-        '<td><span class="del" data-idx="' + i + '">✕</span></td>' +
-        '</tr>';
+        '<td>' + balCell + '</td>' +
+        '<td>' + (s.diasEntrenado != null ? s.diasEntrenado : '—') + '/' + s.diasTotal + '</td>' +
+        '<td style="width:20px;"><span class="hist-arrow" style="color:var(--accent);">▾</span></td>' +
+        '</tr>' +
+        '<tr id="detail-' + i + '" style="display:none;">' +
+        '<td colspan="5" style="padding:0;border-bottom:1px solid var(--line);">' + detailHtml +
+        '<span class="del" data-idx="' + i + '" style="display:block;text-align:right;padding:0 12px 8px;">Eliminar semana ✕</span>' +
+        '</td></tr>';
     }).join('');
-    histEl.innerHTML = '<table><thead><tr><th>Semana</th><th>Peso</th><th>Pasos</th><th>Kcal</th><th>Leg Pr. 1RM</th><th></th></tr></thead><tbody>' + rows2 + '</tbody></table>';
+    histEl.innerHTML = '<table><thead><tr><th>Semana</th><th>Peso</th><th>Bal.</th><th>Entr.</th><th></th></tr></thead><tbody>' + rows2 + '</tbody></table>';
+
+    histEl.querySelectorAll('.hist-row').forEach(function(tr){
+      tr.addEventListener('click', function(){
+        var target = document.getElementById(tr.getAttribute('data-target'));
+        var arrow = tr.querySelector('.hist-arrow');
+        var abierto = target.style.display !== 'none';
+        target.style.display = abierto ? 'none' : 'table-row';
+        arrow.textContent = abierto ? '▾' : '▴';
+      });
+    });
     histEl.querySelectorAll('.del').forEach(function(el){
-      el.addEventListener('click', function(){
+      el.addEventListener('click', function(e){
+        e.stopPropagation();
         if(!confirm('¿Eliminar esta semana cerrada del historial? (los registros diarios no se borran)')) return;
         var idx = parseInt(el.getAttribute('data-idx'), 10);
         var s2 = loadSemanas();
