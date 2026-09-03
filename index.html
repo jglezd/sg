@@ -130,7 +130,7 @@
   <div id="banners"></div>
 
   <div class="card">
-    <h2 id="datosToggle" style="cursor:pointer;">Datos personales <span class="count" id="datosArrow">▸ ajustar</span></h2>
+    <h2 id="datosToggle" style="cursor:pointer;">Datos personales <span class="count" id="datosArrow" style="color:var(--accent);">▾</span></h2>
     <div id="datosBody" style="display:none;">
       <div class="row2">
         <div>
@@ -234,10 +234,12 @@
     <div id="historial"></div>
   </div>
 
-  <button class="btn secondary" id="exportar">Exportar datos (copiar)</button>
+  <button class="btn secondary" id="exportarJson">Exportar a archivo (.json)</button>
+  <button class="btn secondary" id="importarJson">Importar desde archivo (.json)</button>
+  <input type="file" id="importarInput" accept="application/json,.json" style="display:none;">
   <button class="btn secondary" id="borrarTodo" style="color:var(--bad); border-color:var(--bad);">Borrar todos los datos</button>
 
-  <footer>Datos almacenados localmente en este navegador · sin servidor<br>v2026-08-21.2</footer>
+  <footer>Datos almacenados localmente en este navegador · sin servidor<br>v2026-08-21.4</footer>
 </div>
 
 <script>
@@ -265,7 +267,7 @@
   datosToggle.addEventListener('click', function(){
     var abierto = datosBody.style.display !== 'none';
     datosBody.style.display = abierto ? 'none' : 'block';
-    datosArrow.textContent = abierto ? '▸ ajustar' : '▾ ocultar';
+    datosArrow.textContent = abierto ? '▾' : '▴';
   });
 
   var config = loadConfig();
@@ -571,16 +573,69 @@
     render();
   });
 
-  document.getElementById('exportar').addEventListener('click', function(){
-    var payload = { diario: loadDiario(), semanas: loadSemanas() };
+  document.getElementById('exportarJson').addEventListener('click', function(){
+    var payload = {
+      version: 'v2026-08-21.3',
+      exportadoEn: new Date().toISOString(),
+      diario: loadDiario(),
+      semanas: loadSemanas(),
+      config: loadConfig()
+    };
     var text = JSON.stringify(payload, null, 2);
-    if(navigator.clipboard){
-      navigator.clipboard.writeText(text).then(function(){
-        alert('Datos copiados al portapapeles.');
-      }).catch(function(){ prompt('Copia manualmente:', text); });
-    } else {
-      prompt('Copia manualmente:', text);
-    }
+    var blob = new Blob([text], { type: 'application/json' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    var hoy = new Date().toISOString().slice(0,10);
+    a.href = url;
+    a.download = 'bitacora-' + hoy + '.json';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  });
+
+  document.getElementById('importarJson').addEventListener('click', function(){
+    document.getElementById('importarInput').click();
+  });
+
+  document.getElementById('importarInput').addEventListener('change', function(e){
+    var file = e.target.files[0];
+    if(!file) return;
+    var reader = new FileReader();
+    reader.onload = function(ev){
+      var parsed;
+      try{
+        parsed = JSON.parse(ev.target.result);
+      }catch(err){
+        alert('El archivo no es un JSON válido. No se ha importado nada.');
+        e.target.value = '';
+        return;
+      }
+      if(!Array.isArray(parsed.diario) || !Array.isArray(parsed.semanas)){
+        alert('El archivo no tiene el formato esperado (faltan "diario" o "semanas" como listas). No se ha importado nada.');
+        e.target.value = '';
+        return;
+      }
+      var confirmMsg = 'Vas a importar ' + parsed.diario.length + ' día(s) y ' + parsed.semanas.length + ' semana(s) cerrada(s).\n\n' +
+        'Esto SUSTITUIRÁ por completo los datos actuales de este navegador (días, semanas y configuración). Esta acción no se puede deshacer.\n\n' +
+        '¿Continuar?';
+      if(!confirm(confirmMsg)){
+        e.target.value = '';
+        return;
+      }
+      saveDiario(parsed.diario);
+      saveSemanas(parsed.semanas);
+      if(parsed.config && parsed.config.fnac && parsed.config.altura){
+        saveConfig(parsed.config);
+        config = loadConfig();
+        document.getElementById('fnac').value = config.fnac;
+        document.getElementById('altura').value = config.altura;
+      }
+      e.target.value = '';
+      alert('Datos importados correctamente.');
+      render();
+    };
+    reader.readAsText(file);
   });
 
   function fmtDate(d){
