@@ -122,9 +122,9 @@
 <div class="wrap">
 
   <header>
-    <p class="eyebrow">Fase · Déficit</p>
+    <p class="eyebrow" id="eyebrowFase">Fase · Déficit</p>
     <h1>Bitácora diaria</h1>
-    <p class="sub">Registra peso y pasos cada día. Añade los ejercicios de referencia (kg + reps) y la comida solo si ese día toca. Cierra la semana cuando quieras para guardar el resumen.</p>
+    <p class="sub" id="subFase">Registra peso y pasos cada día. Añade los ejercicios de referencia (kg + reps) y la comida solo si ese día toca. Cierra la semana cuando quieras para guardar el resumen.</p>
   </header>
 
   <div id="banners"></div>
@@ -132,6 +132,29 @@
   <div class="card">
     <h2 id="datosToggle" style="cursor:pointer;">Datos personales <span class="count" id="datosArrow" style="color:var(--accent);">▾</span></h2>
     <div id="datosBody" style="display:none;">
+      <label for="fase">Fase actual</label>
+      <select id="fase" style="width:100%;background:var(--panel-2);border:1px solid var(--line);color:var(--text);padding:11px 12px;border-radius:9px;font-size:16px;font-family:var(--mono);">
+        <option value="deficit">Déficit</option>
+        <option value="mantenimiento">Mantenimiento</option>
+        <option value="volumen">Volumen</option>
+      </select>
+      <p class="hint">Cambia cómo se interpretan el ritmo de cambio de peso y el balance calórico (qué se considera "bien" en cada etapa).</p>
+
+      <div class="row2">
+        <div>
+          <label for="pasosObjetivo">Pasos objetivo</label>
+          <input type="number" id="pasosObjetivo" step="500" placeholder="10000">
+        </div>
+        <div>
+          <label for="entrenarHoy">¿Entrenas hoy?</label>
+          <select id="entrenarHoy" style="width:100%;background:var(--panel-2);border:1px solid var(--line);color:var(--text);padding:11px 12px;border-radius:9px;font-size:16px;font-family:var(--mono);">
+            <option value="si">Sí</option>
+            <option value="no">No</option>
+          </select>
+        </div>
+      </div>
+      <p class="hint">Se usan para calcular tu objetivo de kcal/proteína del día, antes de que tengas los datos reales de hoy.</p>
+
       <div class="row2">
         <div>
           <label for="fnac">Fecha de nacimiento</label>
@@ -148,6 +171,9 @@
 
   <div class="card">
     <h2>Registro de hoy</h2>
+
+    <div id="objetivoHoy" class="banner neutral" style="display:none;"></div>
+
 
     <label for="fecha">Fecha</label>
     <input type="date" id="fecha">
@@ -239,7 +265,7 @@
   <input type="file" id="importarInput" accept="application/json,.json" style="display:none;">
   <button class="btn secondary" id="borrarTodo" style="color:var(--bad); border-color:var(--bad);">Borrar todos los datos</button>
 
-  <footer>Datos almacenados localmente en este navegador · sin servidor<br>v2026-08-21.4</footer>
+  <footer>Datos almacenados localmente en este navegador · sin servidor<br>v2026-09-03.2</footer>
 </div>
 
 <script>
@@ -256,8 +282,12 @@
   function loadConfig(){
     try{
       var c = JSON.parse(localStorage.getItem(CONFIG_KEY));
-      return c || { fnac: '1981-12-31', altura: 180 };
-    }catch(e){ return { fnac: '1981-12-31', altura: 180 }; }
+      c = c || { fnac: '1981-12-31', altura: 180 };
+      if(!c.fase) c.fase = 'deficit';
+      if(c.pasosObjetivo == null) c.pasosObjetivo = 10000;
+      if(!c.entrenarHoy) c.entrenarHoy = 'no';
+      return c;
+    }catch(e){ return { fnac: '1981-12-31', altura: 180, fase: 'deficit', pasosObjetivo: 10000, entrenarHoy: 'no' }; }
   }
   function saveConfig(c){ localStorage.setItem(CONFIG_KEY, JSON.stringify(c)); }
 
@@ -273,12 +303,49 @@
   var config = loadConfig();
   document.getElementById('fnac').value = config.fnac;
   document.getElementById('altura').value = config.altura;
+  document.getElementById('fase').value = config.fase;
   document.getElementById('fnac').addEventListener('change', function(){
-    config.fnac = this.value; saveConfig(config); renderBalancePreview();
+    config.fnac = this.value; saveConfig(config); renderBalancePreview(); renderObjetivoHoy();
   });
   document.getElementById('altura').addEventListener('input', function(){
-    config.altura = parseFloat(this.value) || config.altura; saveConfig(config); renderBalancePreview();
+    config.altura = parseFloat(this.value) || config.altura; saveConfig(config); renderBalancePreview(); renderObjetivoHoy();
   });
+  document.getElementById('fase').addEventListener('change', function(){
+    config.fase = this.value; saveConfig(config);
+    actualizarHeaderFase();
+    renderObjetivoHoy();
+    render();
+  });
+
+  document.getElementById('pasosObjetivo').value = config.pasosObjetivo;
+  document.getElementById('entrenarHoy').value = config.entrenarHoy;
+  document.getElementById('pasosObjetivo').addEventListener('input', function(){
+    config.pasosObjetivo = parseFloat(this.value) || 10000; saveConfig(config); renderObjetivoHoy();
+  });
+  document.getElementById('entrenarHoy').addEventListener('change', function(){
+    config.entrenarHoy = this.value; saveConfig(config); renderObjetivoHoy();
+  });
+
+  var FASE_TEXTOS = {
+    deficit: {
+      eyebrow: 'Fase · Déficit',
+      sub: 'Registra peso y pasos cada día. Añade los ejercicios de referencia (kg + reps) y la comida solo si ese día toca. Cierra la semana cuando quieras para guardar el resumen.'
+    },
+    mantenimiento: {
+      eyebrow: 'Fase · Mantenimiento',
+      sub: 'Registra peso y pasos cada día. El objetivo es mantener el peso estable — los avisos buscan poca variación, no bajadas ni subidas.'
+    },
+    volumen: {
+      eyebrow: 'Fase · Volumen',
+      sub: 'Registra peso y pasos cada día. El objetivo es ganar peso de forma controlada — los avisos buscan un superávit moderado y progreso en fuerza.'
+    }
+  };
+  function actualizarHeaderFase(){
+    var t = FASE_TEXTOS[config.fase] || FASE_TEXTOS.deficit;
+    document.getElementById('eyebrowFase').textContent = t.eyebrow;
+    document.getElementById('subFase').textContent = t.sub;
+  }
+  actualizarHeaderFase();
 
   function edadDesde(fnacStr){
     if(!fnacStr) return null;
@@ -320,6 +387,102 @@
       gastoTotal: gastoTotal, kcal: kcalIngeridas,
       balance: kcalIngeridas - gastoTotal
     };
+  }
+
+  // Interpreta el balance diario/semanal según la fase: devuelve 'good' | 'warn'
+  function balanceClase(balance){
+    if(balance == null) return null;
+    var fase = config.fase || 'deficit';
+    if(fase === 'deficit'){
+      return balance <= 0 ? 'good' : 'warn';
+    } else if(fase === 'volumen'){
+      return balance >= 0 ? 'good' : 'warn';
+    } else { // mantenimiento
+      return Math.abs(balance) <= 150 ? 'good' : 'warn';
+    }
+  }
+
+  // Devuelve el banner de ritmo de peso semanal según la fase, o null si no aplica
+  function bannerRitmoPeso(wdiff){
+    var fase = config.fase || 'deficit';
+    if(fase === 'deficit'){
+      if(wdiff > -0.2){
+        return { tipo:'warn', texto:'Casi sin cambio de peso esta semana (' + wdiff.toFixed(1) + ' kg). El déficit real podría ser menor de lo estimado.' };
+      } else if(wdiff < -0.9){
+        return { tipo:'bad', texto:'Bajada de ' + Math.abs(wdiff).toFixed(1) + ' kg — más rápido de lo recomendable. Considera subir ~150-200 kcal para proteger el músculo.' };
+      } else {
+        return { tipo:'good', texto:'Ritmo de pérdida saludable (' + wdiff.toFixed(1) + ' kg). El déficit parece bien calibrado.' };
+      }
+    } else if(fase === 'volumen'){
+      if(wdiff < 0.2){
+        return { tipo:'warn', texto:'Apenas subiste peso esta semana (' + wdiff.toFixed(1) + ' kg). El superávit real podría ser menor de lo estimado.' };
+      } else if(wdiff > 0.4){
+        return { tipo:'bad', texto:'Subida de ' + wdiff.toFixed(1) + ' kg — más rápido de lo recomendable para minimizar ganancia de grasa. Considera bajar ~150-200 kcal.' };
+      } else {
+        return { tipo:'good', texto:'Ritmo de ganancia controlado (+' + wdiff.toFixed(1) + ' kg). El superávit parece bien calibrado.' };
+      }
+    } else { // mantenimiento
+      if(Math.abs(wdiff) <= 0.2){
+        return { tipo:'good', texto:'Peso estable esta semana (' + (wdiff>=0?'+':'') + wdiff.toFixed(1) + ' kg). El mantenimiento parece bien calibrado.' };
+      } else {
+        return { tipo:'warn', texto:'El peso se movió más de lo esperado para mantenimiento (' + (wdiff>=0?'+':'') + wdiff.toFixed(1) + ' kg). Revisa si las calorías se han desviado.' };
+      }
+    }
+  }
+
+  // Banner de contradicción entre balance estimado y peso real, adaptado a la fase
+  function bannerContradiccion(balanceMedio, wdiff2){
+    var fase = config.fase || 'deficit';
+    if(fase === 'mantenimiento') return null; // el banner de ritmo ya cubre cualquier desviación
+    if(fase === 'deficit'){
+      if(balanceMedio > 50 && wdiff2 < -0.15){
+        return 'La estimación calórica sugiere superávit esta semana, pero el peso bajó. El modelo es orientativo — probablemente tu gasto real es algo mayor de lo estimado. No cambies nada solo por este número, guíate por el peso.';
+      } else if(balanceMedio < -50 && wdiff2 > 0.15){
+        return 'La estimación calórica sugiere déficit esta semana, pero el peso subió. Puede ser retención de agua, o el gasto real es menor de lo estimado — vigílalo una semana más antes de sacar conclusiones.';
+      }
+    } else if(fase === 'volumen'){
+      if(balanceMedio < -50 && wdiff2 > 0.15){
+        return 'La estimación calórica sugiere déficit esta semana, pero el peso subió. Probablemente tu gasto real es menor de lo estimado — no cambies nada solo por este número, guíate por el peso.';
+      } else if(balanceMedio > 50 && wdiff2 < -0.15){
+        return 'La estimación calórica sugiere superávit esta semana, pero el peso bajó. Puede ser una semana de mucho desgaste, o el gasto real es mayor de lo estimado — vigílalo una semana más.';
+      }
+    }
+    return null;
+  }
+
+  var MARGEN_FASE = { deficit: -400, mantenimiento: 0, volumen: 300 };
+  var PROTEINA_FACTOR_FASE = { deficit: (2.0+2.2)/2, mantenimiento: (1.8+2.0)/2, volumen: (1.8+2.0)/2 };
+
+  function ultimoPesoConocido(){
+    var data = loadDiario().filter(function(d){ return d.peso != null; });
+    if(data.length === 0) return null;
+    data.sort(function(a,b){ return new Date(a.fecha) - new Date(b.fecha); });
+    return data[data.length-1].peso;
+  }
+
+  function renderObjetivoHoy(){
+    var el = document.getElementById('objetivoHoy');
+    var peso = ultimoPesoConocido();
+    if(peso == null){
+      el.style.display = 'none';
+      return;
+    }
+    var bmr = calcularBMR(peso);
+    if(bmr == null){ el.style.display = 'none'; return; }
+
+    var pasosObjetivo = config.pasosObjetivo || 10000;
+    var entrena = config.entrenarHoy === 'si';
+    var gastoPasos = pasosObjetivo * 0.045;
+    var bonusEntreno = entrena ? 250 : 0;
+    var gastoTotal = bmr + gastoPasos + bonusEntreno;
+    var margen = MARGEN_FASE[config.fase] != null ? MARGEN_FASE[config.fase] : 0;
+    var kcalObjetivo = gastoTotal + margen;
+
+    var factorProt = PROTEINA_FACTOR_FASE[config.fase] != null ? PROTEINA_FACTOR_FASE[config.fase] : 2.0;
+    var proteinaObjetivo = peso * factorProt;
+
+    el.style.display = 'block';
+    el.textContent = 'Objetivo orientativo hoy: ~' + Math.round(kcalObjetivo) + ' kcal · ~' + Math.round(proteinaObjetivo) + ' g proteína (peso: ' + peso + ' kg, pasos: ' + pasosObjetivo + ', entreno: ' + (entrena ? 'sí' : 'no') + ')';
   }
 
   function epley1RM(kg, reps){
@@ -390,7 +553,8 @@
     var balance = calcularBalance(peso, isNaN(pasos)?0:pasos, kcal, esEntrenado);
     if(balance == null){ el.style.display = 'none'; return; }
     el.style.display = 'block';
-    el.className = 'banner ' + (balance > 100 ? 'warn' : (balance < -100 ? 'good' : 'neutral'));
+    var claseVivo = balanceClase(balance);
+    el.className = 'banner ' + (claseVivo || 'neutral');
     var texto = balance >= 0
       ? 'Estimación: superávit de ~' + Math.round(balance) + ' kcal hoy'
       : 'Estimación: déficit de ~' + Math.round(Math.abs(balance)) + ' kcal hoy';
@@ -644,6 +808,7 @@
   }
 
   function render(){
+    renderObjetivoHoy();
     var diario = loadDiario();
     var semanas = loadSemanas();
     var abiertos = diario.filter(function(d){ return !d.cerrada; }).sort(function(a,b){ return new Date(a.fecha)-new Date(b.fecha); });
@@ -673,9 +838,11 @@
         }
 
         var clicable = d.balance != null;
+        var claseBalDia = balanceClase(d.balance);
+        var colorBalDia = claseBalDia === 'good' ? 'var(--good)' : (claseBalDia === 'warn' ? 'var(--warn)' : 'inherit');
         var balCell = d.balance != null ? (d.balance >= 0 ? '+' : '') + Math.round(d.balance) : '—';
         if(clicable){
-          balCell = '<span class="bal-toggle" data-target="bal-detail-' + idx + '" style="cursor:pointer;text-decoration:underline dotted;">' + balCell + '</span>';
+          balCell = '<span class="bal-toggle" data-target="bal-detail-' + idx + '" style="cursor:pointer;text-decoration:underline dotted;color:' + colorBalDia + ';">' + balCell + '</span>';
         }
 
         var mainRow = '<tr>' +
@@ -741,8 +908,9 @@
     var exLabel2 = { legpress: 'LP', pullup: 'PU', bench: 'BP' };
     var rows2 = semanas.slice().reverse().map(function(s, idx){
       var i = semanas.length - 1 - idx;
+      var claseBalSem = balanceClase(s.balanceMedio);
       var balCell = s.balanceMedio != null
-        ? '<span class="' + (s.balanceMedio >= 0 ? 'value warn' : 'value good') + '" style="font-family:inherit;font-size:inherit;">' + (s.balanceMedio >= 0 ? '+' : '') + Math.round(s.balanceMedio) + '</span>'
+        ? '<span class="value ' + (claseBalSem || '') + '" style="font-family:inherit;font-size:inherit;">' + (s.balanceMedio >= 0 ? '+' : '') + Math.round(s.balanceMedio) + '</span>'
         : '—';
 
       var detailBits = [];
@@ -834,12 +1002,9 @@
 
       if(last.pesoMedio != null && prev.pesoMedio != null){
         var wdiff = last.pesoMedio - prev.pesoMedio;
-        if(wdiff > -0.2){
-          banners.push('<div class="banner warn">Casi sin cambio de peso esta semana (' + wdiff.toFixed(1) + ' kg). El déficit real podría ser menor de lo estimado.</div>');
-        } else if(wdiff < -0.9){
-          banners.push('<div class="banner bad">Bajada de ' + Math.abs(wdiff).toFixed(1) + ' kg — más rápido de lo recomendable. Considera subir ~150-200 kcal para proteger el músculo.</div>');
-        } else {
-          banners.push('<div class="banner good">Ritmo de pérdida saludable (' + wdiff.toFixed(1) + ' kg). El déficit parece bien calibrado.</div>');
+        var bRitmo = bannerRitmoPeso(wdiff);
+        if(bRitmo){
+          banners.push('<div class="banner ' + bRitmo.tipo + '">' + bRitmo.texto + '</div>');
         }
       }
 
@@ -852,10 +1017,9 @@
 
       if(last.balanceMedio != null && last.pesoMedio != null && prev.pesoMedio != null){
         var wdiff2 = last.pesoMedio - prev.pesoMedio;
-        if(last.balanceMedio > 50 && wdiff2 < -0.15){
-          banners.push('<div class="banner neutral">La estimación calórica sugiere superávit esta semana, pero el peso bajó. El modelo es orientativo — probablemente tu gasto real es algo mayor de lo estimado. No cambies nada solo por este número, guíate por el peso.</div>');
-        } else if(last.balanceMedio < -50 && wdiff2 > 0.15){
-          banners.push('<div class="banner neutral">La estimación calórica sugiere déficit esta semana, pero el peso subió. Puede ser retención de agua, o el gasto real es menor de lo estimado — vigílalo una semana más antes de sacar conclusiones.</div>');
+        var textoContra = bannerContradiccion(last.balanceMedio, wdiff2);
+        if(textoContra){
+          banners.push('<div class="banner neutral">' + textoContra + '</div>');
         }
       }
 
