@@ -140,20 +140,9 @@
       </select>
       <p class="hint">Cambia cómo se interpretan el ritmo de cambio de peso y el balance calórico (qué se considera "bien" en cada etapa).</p>
 
-      <div class="row2">
-        <div>
-          <label for="pasosObjetivo">Pasos objetivo</label>
-          <input type="number" id="pasosObjetivo" step="500" placeholder="10000">
-        </div>
-        <div>
-          <label for="entrenarHoy">¿Entrenas hoy?</label>
-          <select id="entrenarHoy" style="width:100%;background:var(--panel-2);border:1px solid var(--line);color:var(--text);padding:11px 12px;border-radius:9px;font-size:16px;font-family:var(--mono);">
-            <option value="si">Sí</option>
-            <option value="no">No</option>
-          </select>
-        </div>
-      </div>
-      <p class="hint">Se usan para calcular tu objetivo de kcal/proteína del día, antes de que tengas los datos reales de hoy.</p>
+      <label for="pasosObjetivo">Pasos objetivo</label>
+      <input type="number" id="pasosObjetivo" step="500" placeholder="10000">
+      <p class="hint">Se usa junto al interruptor "Entrenado hoy" del registro diario para calcular tu objetivo de kcal/proteína del día.</p>
 
       <div class="row2">
         <div>
@@ -172,7 +161,10 @@
   <div class="card">
     <h2>Registro de hoy</h2>
 
-    <div id="objetivoHoy" class="banner neutral" style="display:none;"></div>
+    <div id="objetivoHoy" style="display:none; background:linear-gradient(135deg, var(--accent-dim), var(--panel-2)); border:1.5px solid var(--accent); border-radius:12px; padding:14px 16px; margin-bottom:4px;">
+      <div style="font-size:10.5px; text-transform:uppercase; letter-spacing:.1em; color:var(--accent); font-weight:700; margin-bottom:4px;">Objetivo orientativo de hoy</div>
+      <div id="objetivoHoyTexto" style="font-family:var(--mono); font-size:15px; font-weight:600; line-height:1.5;"></div>
+    </div>
 
 
     <label for="fecha">Fecha</label>
@@ -265,7 +257,7 @@
   <input type="file" id="importarInput" accept="application/json,.json" style="display:none;">
   <button class="btn secondary" id="borrarTodo" style="color:var(--bad); border-color:var(--bad);">Borrar todos los datos</button>
 
-  <footer>Datos almacenados localmente en este navegador · sin servidor<br>v2026-09-03.2</footer>
+  <footer>Datos almacenados localmente en este navegador · sin servidor<br>v2026-09-03.3</footer>
 </div>
 
 <script>
@@ -285,9 +277,8 @@
       c = c || { fnac: '1981-12-31', altura: 180 };
       if(!c.fase) c.fase = 'deficit';
       if(c.pasosObjetivo == null) c.pasosObjetivo = 10000;
-      if(!c.entrenarHoy) c.entrenarHoy = 'no';
       return c;
-    }catch(e){ return { fnac: '1981-12-31', altura: 180, fase: 'deficit', pasosObjetivo: 10000, entrenarHoy: 'no' }; }
+    }catch(e){ return { fnac: '1981-12-31', altura: 180, fase: 'deficit', pasosObjetivo: 10000 }; }
   }
   function saveConfig(c){ localStorage.setItem(CONFIG_KEY, JSON.stringify(c)); }
 
@@ -318,12 +309,8 @@
   });
 
   document.getElementById('pasosObjetivo').value = config.pasosObjetivo;
-  document.getElementById('entrenarHoy').value = config.entrenarHoy;
   document.getElementById('pasosObjetivo').addEventListener('input', function(){
     config.pasosObjetivo = parseFloat(this.value) || 10000; saveConfig(config); renderObjetivoHoy();
-  });
-  document.getElementById('entrenarHoy').addEventListener('change', function(){
-    config.entrenarHoy = this.value; saveConfig(config); renderObjetivoHoy();
   });
 
   var FASE_TEXTOS = {
@@ -471,7 +458,7 @@
     if(bmr == null){ el.style.display = 'none'; return; }
 
     var pasosObjetivo = config.pasosObjetivo || 10000;
-    var entrena = config.entrenarHoy === 'si';
+    var entrena = esEntrenado;
     var gastoPasos = pasosObjetivo * 0.045;
     var bonusEntreno = entrena ? 250 : 0;
     var gastoTotal = bmr + gastoPasos + bonusEntreno;
@@ -482,7 +469,11 @@
     var proteinaObjetivo = peso * factorProt;
 
     el.style.display = 'block';
-    el.textContent = 'Objetivo orientativo hoy: ~' + Math.round(kcalObjetivo) + ' kcal · ~' + Math.round(proteinaObjetivo) + ' g proteína (peso: ' + peso + ' kg, pasos: ' + pasosObjetivo + ', entreno: ' + (entrena ? 'sí' : 'no') + ')';
+    document.getElementById('objetivoHoyTexto').innerHTML =
+      '~' + Math.round(kcalObjetivo) + ' kcal · ~' + Math.round(proteinaObjetivo) + ' g proteína' +
+      '<div style="font-family:inherit; font-size:11.5px; font-weight:400; color:var(--muted); margin-top:3px;">' +
+      'peso: ' + peso + ' kg · pasos: ' + pasosObjetivo + ' · entreno: ' + (entrena ? 'sí' : 'no') +
+      '</div>';
   }
 
   function epley1RM(kg, reps){
@@ -525,6 +516,7 @@
     esEntrenado = !esEntrenado;
     entrenadoBtn.classList.toggle('on', esEntrenado);
     renderBalancePreview();
+    renderObjetivoHoy();
   });
 
   ['legpress_kg','pullup_kg','bench_kg'].forEach(function(id){
@@ -534,6 +526,7 @@
         entrenadoBtn.classList.add('on');
       }
       renderBalancePreview();
+      renderObjetivoHoy();
     });
   });
 
