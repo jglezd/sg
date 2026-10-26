@@ -132,6 +132,7 @@ details.ses summary small{color:var(--mu);display:block}
 .newex select{grid-column:1/-1}
 #toast{position:fixed;left:50%;bottom:calc(86px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:#fff;color:#111;padding:10px 16px;border-radius:12px;font-weight:600;font-size:15px;z-index:30;opacity:0;pointer-events:none;transition:opacity .2s;max-width:90%;text-align:center}
 #toast.show{opacity:1}
+.ver{text-align:center;color:var(--mu);font-size:12px;margin:30px 0 0}
 .empty{text-align:center;padding:28px 8px;color:var(--mu)}
 .empty .btn{margin-top:14px}
 .goal{background:var(--acs);border-radius:18px;padding:16px;margin-bottom:14px;color:#e8f0ff}
@@ -158,6 +159,11 @@ input:disabled{opacity:.5}
 .cmp{display:grid;grid-template-columns:1.5fr 1fr 1fr 1fr;gap:6px 8px;font-size:14px;align-items:center}
 .cmp .h{color:var(--mu);font-size:12px}
 .cmp .r{text-align:right}
+#rest{position:fixed;left:12px;right:12px;bottom:calc(12px + env(safe-area-inset-bottom,0px));background:var(--acs);color:#fff;border-radius:16px;padding:10px 12px 10px 18px;display:flex;align-items:center;gap:14px;z-index:6;max-width:536px;margin:0 auto;box-shadow:0 6px 24px rgba(0,0,0,.4)}
+#rest[hidden]{display:none}
+#rest span{color:#b9d1ff}
+#rest b{font-size:28px;flex:1;font-variant-numeric:tabular-nums}
+#rest button{background:var(--ac);border-radius:12px;padding:12px 18px;font-weight:600;text-align:center}
 @media (prefers-reduced-motion:reduce){#toast{transition:none}}
 </style>
 </head>
@@ -171,12 +177,14 @@ input:disabled{opacity:.5}
 </nav>
 <div id="modal" hidden></div>
 <div id="toast"></div>
+<div id="rest" hidden><span>Descanso</span><b id="rest-t">1:00</b><button data-act="rskip">Saltar</button></div>
 
 <script>
 (function(){
 'use strict';
 
 /* ---------- utilidades ---------- */
+var APP_VERSION='0.4';
 var KEY='gymlog.v1', DAY=864e5;
 var $app=document.getElementById('app'), $tabs=document.getElementById('tabs'),
     $modal=document.getElementById('modal'), $toast=document.getElementById('toast');
@@ -207,7 +215,7 @@ function newEx(name,type){
   type=type||'weight';
   return {id:uid(),name:name,type:type,sets:3,
     min:type==='time'?30:type==='reps'?8:6, max:type==='time'?45:type==='reps'?12:8,
-    step:type==='weight'?2.5:type==='time'?5:1, back:false, note:''};
+    step:type==='weight'?2.5:type==='time'?5:1, back:false, note:'', rest:60};
 }
 function hist(exId){
   var out=[];
@@ -281,6 +289,7 @@ function entryDone(e){return e.sets.length>0&&e.sets.every(function(s){return s.
 function startSession(dayId){
   var d=S.days.find(function(x){return x.id===dayId;});
   var entries=d.exIds.filter(function(id){return S.exercises[id];}).map(mkEntry);
+  stopRest();
   S.current={id:uid(),dayId:d.id,dayName:d.name,started:Date.now(),discomfort:null,entries:entries};
   ui.open=0;save();go('sesion');
 }
@@ -291,7 +300,7 @@ function finishSession(){
   }).filter(function(e){return e.sets.length;});
   if(!entries.length){toast('Marca al menos una serie');return;}
   S.sessions.push({id:c.id,dayId:c.dayId,dayName:c.dayName,date:Date.now(),discomfort:c.discomfort==null?null:c.discomfort,entries:entries});
-  S.current=null;stopTimerSilently();
+  S.current=null;stopTimerSilently();stopRest();
   var tk=dkey(Date.now()),br=S.body.days[tk];
   if(!(br&&br.closed)){br=ensureDay(tk);br.trained=true;}
   save();
@@ -302,9 +311,22 @@ function finishSession(){
 /* ---------- cronómetro ---------- */
 function lock(){try{if(navigator.wakeLock){navigator.wakeLock.request('screen').then(function(l){wl=l;}).catch(function(){});}}catch(e){}}
 function unlock(){try{if(wl)wl.release();}catch(e){}wl=null;}
-function stopTimerSilently(){tm=null;unlock();}
+function stopTimerSilently(){tm=null;idleUnlock();}
 function vib(p){try{if(navigator.vibrate)navigator.vibrate(p);}catch(e){}}
+/* descanso entre series */
+var rt=null;
+function restOf(ex){return ex.rest==null?60:ex.rest;}
+function idleUnlock(){if(!tm&&!rt)unlock();}
+function restTick(){var el=document.getElementById('rest-t');if(!el||!rt)return;el.textContent=fmtT(Math.max(0,Math.ceil(rt.dur-(Date.now()-rt.t0)/1000)));}
+function restBar(){var el=document.getElementById('rest');if(!el)return;var show=!!rt&&ui.screen==='sesion';el.hidden=!show;if(show)restTick();}
+function stopRest(){rt=null;idleUnlock();restBar();}
+function startRest(e){
+  var ex=S.exercises[e.exId],d=ex?restOf(ex):0;
+  if(!ex||d<=0||entryDone(e)){if(rt)stopRest();return;}
+  rt={t0:Date.now(),dur:d};lock();restBar();
+}
 setInterval(function(){
+  if(rt){if(rt.dur-(Date.now()-rt.t0)/1000<=0){stopRest();vib([200,100,200]);toast('Descanso terminado');}else restTick();}
   if(!tm||!S.current)return;
   var sec=Math.floor((Date.now()-tm.t0)/1000);
   var el=document.querySelector('[data-tmr]');if(el)el.textContent=fmtT(sec);
@@ -312,7 +334,7 @@ setInterval(function(){
   if(!tm.vMin&&sec>=ex.min){tm.vMin=true;vib(80);}
   if(!tm.vMax&&sec>=ex.max){tm.vMax=true;vib([80,60,80]);}
 },250);
-document.addEventListener('visibilitychange',function(){if(!document.hidden&&tm)lock();});
+document.addEventListener('visibilitychange',function(){if(!document.hidden&&(tm||rt))lock();});
 
 /* ---------- modal, toast ---------- */
 function modal(html,h){modalH=h||{};$modal.innerHTML='<div class="sheet">'+html+'</div>';$modal.hidden=false;}
@@ -350,8 +372,10 @@ function render(keep){
   var v={hoy:vHoy,sesion:vSesion,resumen:vResumen,datos:vDatos,progreso:vProgreso,prog_ex:vProgEx,rutina:vRutina,rut_dia:vRutDia,rut_ex:vRutEx,cuerpo:vCuerpo,cuerpo_cfg:vCuerpoCfg}[ui.screen]||vHoy;
   var html=v();
   if(!storageOK)html='<div class="banner err">Este navegador no permite guardar datos. Lo que registres se perderá al cerrar. Exporta una copia desde Datos.</div>'+html;
+  html+='<p class="ver">Versión '+APP_VERSION+'</p>';
   $app.innerHTML=html;
   $tabs.style.display=(ui.screen==='sesion'||ui.screen==='resumen')?'none':'flex';
+  restBar();
   var t=TAB[ui.screen];
   Array.prototype.forEach.call($tabs.children,function(b){b.classList.toggle('on',b.dataset.to===t);});
   if(keep)window.scrollTo(0,y);
@@ -544,6 +568,7 @@ function vRutEx(){
   h+='<label class="lbl">Series</label><div class="stepper"><button class="sb" data-act="exsets" data-d="-1" aria-label="Menos">−</button><b>'+ex.sets+'</b><button class="sb" data-act="exsets" data-d="1" aria-label="Más">+</button></div>';
   h+='<label class="lbl">Rango de '+u+'</label><div class="two"><input inputmode="decimal" value="'+fmtN(ex.min)+'" data-bind="ex" data-f="min" aria-label="Mínimo"><input inputmode="decimal" value="'+fmtN(ex.max)+'" data-bind="ex" data-f="max" aria-label="Máximo"></div>';
   if(ex.type!=='reps')h+='<label class="lbl" for="f-step">Salto ('+(ex.type==='time'?'segundos':'kg')+')</label><input id="f-step" inputmode="decimal" value="'+fmtN(ex.step)+'" data-bind="ex" data-f="step">';
+  h+='<label class="lbl" for="f-rest">Descanso entre series (segundos, 0 = sin temporizador)</label><input id="f-rest" inputmode="numeric" value="'+restOf(ex)+'" data-bind="ex" data-f="rest">';
   h+='<label class="sw"><span>Sensible a la espalda</span><input type="checkbox" data-bind="ex" data-f="back"'+(ex.back?' checked':'')+'></label>';
   h+='<label class="lbl" for="f-note">Nota para la sesión (opcional)</label><input id="f-note" value="'+esc(ex.note||'')+'" placeholder="Ej. anotar el lado más flojo" data-bind="ex" data-f="note" autocomplete="off">';
   h+='<div style="height:22px"></div><button class="btn danger" data-act="delex">Eliminar ejercicio</button>';
@@ -604,7 +629,7 @@ function normEx(x){
   var type=['weight','time','reps'].indexOf(x.type)>=0?x.type:'weight';
   var min=num(x.min,type==='time'?30:6), max=num(x.max,type==='time'?45:8);if(max<min)max=min;
   return {name:String(x.name).trim(),type:type,sets:Math.max(1,Math.round(num(x.sets,3))),min:min,max:max,
-    step:num(x.step,type==='weight'?2.5:type==='time'?5:1),back:!!x.back,note:x.note?String(x.note):''};
+    step:num(x.step,type==='weight'?2.5:type==='time'?5:1),back:!!x.back,note:x.note?String(x.note):'',rest:Math.max(0,Math.round(num(x.rest,60)))};
 }
 function validateRoutine(o){
   if(!Array.isArray(o.days))throw new Error('Falta la lista «days».');
@@ -945,7 +970,7 @@ function stopTimer(){
   var sec=Math.max(1,Math.round((Date.now()-tm.t0)/1000));
   var e=S.current.entries[tm.ei],s=e&&e.sets[tm.si];
   if(s){s.r=sec;s.done=true;}
-  var ei=tm.ei;tm=null;unlock();save();
+  var ei=tm.ei;tm=null;idleUnlock();save();if(s&&s.done)startRest(e);
   if(e&&entryDone(e)){var nx=nextUndone(ei);if(nx>=0){ui.open=nx;render(true);scrollToEntry(nx);return;}}
   render(true);
 }
@@ -977,6 +1002,7 @@ var A={
       s.done=true;
     }else s.done=false;
     save();
+    if(s.done)startRest(e);
     if(s.done&&entryDone(e)){var nx=nextUndone(ei);if(nx>=0){ui.open=nx;render(true);scrollToEntry(nx);return;}}
     render(true);
   },
@@ -1000,7 +1026,7 @@ var A={
   },
   lumb:function(el){S.current.discomfort=+el.dataset.v;save();render(true);},
   finish:function(){finishSession();},
-  discard:function(){ask('Descartar sesión','Se perderán las series de esta sesión.','Descartar',function(){stopTimerSilently();S.current=null;save();go('hoy');});},
+  discard:function(){ask('Descartar sesión','Se perderán las series de esta sesión.','Descartar',function(){stopTimerSilently();stopRest();S.current=null;save();go('hoy');});},
   seg:function(el){ui.seg=el.dataset.v;render(false);},
   metric:function(el){ui.metric=+el.dataset.v;render(true);},
   /* rutina */
@@ -1022,6 +1048,7 @@ var A={
       if(!hist(ex.id).length)delete S.exercises[ex.id];
       save();go(ui.dayId&&curDay()?'rut_dia':'rutina');});
   },
+  rskip:function(){stopRest();},
   /* cuerpo */
   bnav:function(el){var k=ui.bDate||dkey(Date.now()),n=new Date(kdate(k));n.setDate(n.getDate()+(+el.dataset.d));var nk=dkey(n);if(nk>dkey(Date.now()))return;ui.bDate=nk;ui.bBreak=false;render(true);},
   bopt:function(){ui.bOpt=!ui.bOpt;render(true);},
@@ -1092,6 +1119,7 @@ document.addEventListener('change',function(ev){
   else{
     var n=parseN(el.value);
     if(n==null||n<0){el.value=fmtN(ex[f2]);return;}
+    if(f2==='rest')n=Math.round(n);
     ex[f2]=n;
     if(ex.max<ex.min){if(f2==='min')ex.max=n;else ex.min=n;render(true);}
   }

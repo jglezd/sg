@@ -1,6 +1,6 @@
 /* Service worker de Gym: la app funciona sin conexión.
-   Sube el número de VERSION cada vez que publiques cambios para forzar la actualización. */
-var VERSION = 'gym-v1';
+   Cambia VERSION (y APP_VERSION en index.html) a la vez, con el mismo número, cada vez que publiques cambios. */
+var VERSION = 'gym-0.4';
 var FILES = ['./', 'index.html', 'manifest.webmanifest', 'icon-180.png', 'icon-192.png', 'icon-512.png'];
 
 self.addEventListener('install', function (e) {
