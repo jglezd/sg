@@ -212,7 +212,7 @@ input:disabled{opacity:.5}
 'use strict';
 
 /* ---------- utilidades ---------- */
-var APP_VERSION='0.6.3';
+var APP_VERSION='0.8';
 var KEY='gymlog.v1', DAY=864e5;
 var $app=document.getElementById('app'), $tabs=document.getElementById('tabs'),
     $modal=document.getElementById('modal'), $toast=document.getElementById('toast');
@@ -999,6 +999,82 @@ function vCuerpoCfg(){
 }
 
 /* ---------- comida: alimentos, recetas y diario ---------- */
+/* Alimentos básicos: valores medios orientativos por 100 g (tablas de composición como USDA FoodData Central y BEDCA) */
+var BASICS=[
+  ['huevo','Huevo entero (crudo)','Huevos y lácteos',143,12.6,0.7,9.5,'huevo',55],
+  ['clara','Clara de huevo (cruda)','Huevos y lácteos',52,10.9,0.7,0.2,'clara',35],
+  ['yema','Yema de huevo (cruda)','Huevos y lácteos',322,15.9,3.6,26.5,'yema',18],
+  ['leche-entera','Leche entera','Huevos y lácteos',61,3.2,4.8,3.3,null,null],
+  ['leche-semi','Leche semidesnatada','Huevos y lácteos',46,3.4,4.9,1.6,null,null],
+  ['leche-desnatada','Leche desnatada','Huevos y lácteos',34,3.4,5.0,0.1,null,null],
+  ['yogur-natural','Yogur natural','Huevos y lácteos',61,3.5,4.7,3.3,null,null],
+  ['pechuga-pollo','Pechuga de pollo (cruda)','Carnes',120,22.5,0,2.6,null,null],
+  ['muslo-pollo','Muslo de pollo sin piel (crudo)','Carnes',121,19.7,0,4.1,null,null],
+  ['pechuga-pavo','Pechuga de pavo (cruda)','Carnes',114,23.7,0,1.5,null,null],
+  ['ternera-magra','Ternera magra (cruda)','Carnes',130,21.5,0,4.5,null,null],
+  ['picada-ternera','Carne picada de ternera, 10 % de grasa (cruda)','Carnes',176,20,0,10,null,null],
+  ['lomo-cerdo','Lomo de cerdo magro (crudo)','Carnes',143,21.5,0,5.3,null,null],
+  ['salmon','Salmón (crudo)','Pescados y mariscos',208,20.4,0,13.4,null,null],
+  ['atun-rojo','Atún rojo (crudo)','Pescados y mariscos',144,23.3,0,4.9,null,null],
+  ['atun-lata','Atún en conserva al natural (escurrido)','Pescados y mariscos',116,25.5,0,0.8,null,null],
+  ['bacalao','Bacalao fresco (crudo)','Pescados y mariscos',82,17.8,0,0.7,null,null],
+  ['gambas','Gambas o langostinos (crudos)','Pescados y mariscos',85,20.1,0.2,0.5,null,null],
+  ['arroz-crudo','Arroz blanco (crudo)','Cereales y tubérculos',365,7.1,80,0.7,null,null],
+  ['arroz-cocido','Arroz blanco (cocido)','Cereales y tubérculos',130,2.7,28.2,0.3,null,null],
+  ['pasta-cruda','Pasta (cruda)','Cereales y tubérculos',371,13,74.7,1.5,null,null],
+  ['pasta-cocida','Pasta (cocida)','Cereales y tubérculos',158,5.8,30.9,0.9,null,null],
+  ['avena','Copos de avena','Cereales y tubérculos',379,13.2,67.7,6.5,null,null],
+  ['pan-blanco','Pan blanco','Cereales y tubérculos',266,8.9,49.4,3.3,null,null],
+  ['pan-integral','Pan integral','Cereales y tubérculos',252,12.5,42.7,3.5,null,null],
+  ['patata','Patata (cruda)','Cereales y tubérculos',77,2,17.5,0.1,null,null],
+  ['boniato','Boniato (crudo)','Cereales y tubérculos',86,1.6,20.1,0.1,null,null],
+  ['harina-trigo','Harina de trigo','Cereales y tubérculos',364,10.3,76.3,1,null,null],
+  ['lentejas-secas','Lentejas (secas)','Legumbres',352,24.6,63.4,1.1,null,null],
+  ['lentejas-cocidas','Lentejas (cocidas)','Legumbres',116,9,20.1,0.4,null,null],
+  ['garbanzos-secos','Garbanzos (secos)','Legumbres',378,20.5,62.9,6,null,null],
+  ['garbanzos-cocidos','Garbanzos (cocidos)','Legumbres',164,8.9,27.4,2.6,null,null],
+  ['alubias-cocidas','Alubias blancas (cocidas)','Legumbres',139,9.7,25.1,0.4,null,null],
+  ['platano','Plátano (pulpa)','Frutas',89,1.1,22.8,0.3,null,null],
+  ['manzana','Manzana','Frutas',52,0.3,13.8,0.2,null,null],
+  ['naranja','Naranja','Frutas',47,0.9,11.8,0.1,null,null],
+  ['mandarina','Mandarina','Frutas',53,0.8,13.3,0.3,null,null],
+  ['pera','Pera','Frutas',57,0.4,15.2,0.1,null,null],
+  ['fresas','Fresas','Frutas',32,0.7,7.7,0.3,null,null],
+  ['arandanos','Arándanos','Frutas',57,0.7,14.5,0.3,null,null],
+  ['uvas','Uvas','Frutas',69,0.7,18.1,0.2,null,null],
+  ['kiwi','Kiwi','Frutas',61,1.1,14.7,0.5,null,null],
+  ['pina','Piña','Frutas',50,0.5,13.1,0.1,null,null],
+  ['sandia','Sandía','Frutas',30,0.6,7.6,0.2,null,null],
+  ['melon','Melón','Frutas',34,0.8,8.2,0.2,null,null],
+  ['aguacate','Aguacate','Frutas',160,2,8.5,14.7,null,null],
+  ['tomate','Tomate','Verduras',18,0.9,3.9,0.2,null,null],
+  ['lechuga','Lechuga','Verduras',15,1.4,2.9,0.2,null,null],
+  ['zanahoria','Zanahoria','Verduras',41,0.9,9.6,0.2,null,null],
+  ['brocoli','Brócoli (crudo)','Verduras',34,2.8,6.6,0.4,null,null],
+  ['espinacas','Espinacas (crudas)','Verduras',23,2.9,3.6,0.4,null,null],
+  ['cebolla','Cebolla','Verduras',40,1.1,9.3,0.1,null,null],
+  ['pimiento-rojo','Pimiento rojo','Verduras',31,1,6,0.3,null,null],
+  ['calabacin','Calabacín','Verduras',17,1.2,3.1,0.3,null,null],
+  ['pepino','Pepino','Verduras',15,0.7,3.6,0.1,null,null],
+  ['champinones','Champiñones','Verduras',22,3.1,3.3,0.3,null,null],
+  ['judias-verdes','Judías verdes','Verduras',31,1.8,7,0.2,null,null],
+  ['berenjena','Berenjena','Verduras',25,1,5.9,0.2,null,null],
+  ['coliflor','Coliflor','Verduras',25,1.9,5,0.3,null,null],
+  ['aceite-oliva','Aceite de oliva','Grasas y frutos secos',884,0,0,100,null,null],
+  ['mantequilla','Mantequilla','Grasas y frutos secos',717,0.9,0.1,81.1,null,null],
+  ['almendras','Almendras','Grasas y frutos secos',579,21.2,21.6,49.9,null,null],
+  ['nueces','Nueces','Grasas y frutos secos',654,15.2,13.7,65.2,null,null],
+  ['cacahuetes','Cacahuetes','Grasas y frutos secos',567,25.8,16.1,49.2,null,null],
+  ['crema-cacahuete','Crema de cacahuete','Grasas y frutos secos',588,25.1,20,50.4,null,null],
+  ['anacardos','Anacardos','Grasas y frutos secos',553,18.2,30.2,43.9,null,null],
+  ['pistachos','Pistachos','Grasas y frutos secos',560,20.2,27.2,45.3,null,null],
+  ['chia','Semillas de chía','Grasas y frutos secos',486,16.5,42.1,30.7,null,null],
+  ['azucar','Azúcar','Otros',387,0,100,0,null,null],
+  ['miel','Miel','Otros',304,0.3,82.4,0,null,null],
+  ['chocolate-negro','Chocolate negro (70-85 %)','Otros',598,7.8,45.9,42.6,null,null]
+].map(function(a){return {id:a[0],n:a[1],g:a[2],k:a[3],p:a[4],c:a[5],f:a[6],u:a[7]?{name:a[7],g:a[8]}:null};});
+function norm(t){return String(t||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');}
+
 function f0(n){return n==null?'—':String(Math.round(n));}
 function f1(n){return n==null?'—':String(Math.round(n*10)/10).replace('.',',');}
 function fin(n){return n==null?'':String(Math.round(n*100)/100).replace('.',',');}
@@ -1097,25 +1173,28 @@ function vComidaGest(){
 /* ---------- hoja de añadir ---------- */
 function openAdd(tab){
   ui.ftab=tab||ui.ftab||'foods';
-  var tabs=[['foods','Alimentos'],['recipes','Recetas'],['code','Buscar'],['new','Nuevo'],['copy','Copiar']];
+  var tabs=[['foods','Alimentos'],['recipes','Recetas'],['code','Código'],['new','Nuevo'],['copy','Copiar']];
   var h='<h3>Añadir</h3><div class="seg">'+tabs.map(function(t){return '<button data-m="tab" data-v="'+t[0]+'" class="'+(ui.ftab===t[0]?'on':'')+'">'+t[1]+'</button>';}).join('')+'</div>';
   var hd={close:closeModal,tab:function(el){openAdd(el.dataset.v);}};
   if(ui.ftab==='foods'){
-    h+='<input id="q" placeholder="Buscar en mis alimentos" autocomplete="off"><div class="plist" id="flist" style="margin-top:8px"></div>';
+    h+='<input id="q" placeholder="Buscar alimentos (huevo, pollo, arroz…)" autocomplete="off"><div class="plist" id="flist" style="margin-top:8px"></div>';
     hd.pickfood=function(el){qtySheet('food',getFood(el.dataset.id));};
+    hd.pickbasic=function(el){
+      var b=BASICS.filter(function(x){return x.id===el.dataset.id;})[0];if(!b)return;
+      var mine=S.food.foods.filter(function(f){return f.bid===b.id;})[0];
+      if(mine){qtySheet('food',mine);return;}
+      qtySheet('food',{id:uid(),bid:b.id,name:b.n,kcal:b.k,prot:b.p,carb:b.c,fat:b.f,unit:b.u?{name:b.u.name,g:b.u.g}:null,fav:false,pending:true});
+    };
   }else if(ui.ftab==='recipes'){
     h+='<div class="plist">'+(S.food.recipes.map(function(r){var t=recTot(r);return '<button class="fpi" data-m="pickrec" data-id="'+r.id+'"><span class="t"><b>'+esc(r.name)+'</b><small>Por ración: '+f0(t.kcal)+' kcal · '+mc(t)+'</small></span>'+(t.miss.length?'<span class="st">!</span>':'')+'</button>';}).join('')||'<p class="mu">Aún no tienes recetas.</p>')+'</div>'+
        '<button class="btn sec small" data-m="newrec" style="text-align:center">+ Nueva receta</button><div style="height:10px"></div>';
     hd.pickrec=function(el){qtySheet('recipe',getRec(el.dataset.id));};
     hd.newrec=function(){recipeEditor(null);};
   }else if(ui.ftab==='code'){
-    if(ui.fSpain==null)ui.fSpain=true;
-    h+='<p class="mu" style="font-size:14px">Busca por nombre, escribe el código de barras o escanéalo. Los productos salen de Open Food Facts, una base de datos abierta, y se guardan en tus alimentos.</p>'+
-       '<div style="display:grid;grid-template-columns:1fr auto;gap:8px"><input id="code" placeholder="Nombre o código de barras" autocomplete="off" enterkeyhint="search"><button class="btn" style="width:auto" data-m="scan">Escanear</button></div>'+
-       '<label class="sw" style="margin:10px 0"><span>Solo productos de España</span><input type="checkbox" id="spOnly"'+(ui.fSpain?' checked':'')+'></label><button class="btn sec" data-m="find">Buscar</button><div id="codeRes"></div>';
-    hd.find=function(){doSearch(document.getElementById('code').value,hd);};
+    h+='<p class="mu" style="font-size:14px">Escanea el código de barras o escríbelo. Los productos se buscan en Open Food Facts, una base de datos abierta, y se guardan en tus alimentos.</p>'+
+       '<div style="display:grid;grid-template-columns:1fr auto;gap:8px"><input id="code" inputmode="numeric" placeholder="Código de barras" autocomplete="off"><button class="btn" style="width:auto" data-m="scan">Escanear</button></div><div style="height:10px"></div><button class="btn sec" data-m="find">Buscar</button><div id="codeRes"></div>';
+    hd.find=function(){runLookup(document.getElementById('code').value,hd);};
     hd.scan=function(){openScan(function(code){openAdd('code');document.getElementById('code').value=code;runLookup(code,modalH);});};
-    hd.pickres=function(el){pickResult(+el.dataset.i);};
   }else if(ui.ftab==='copy'){
     var today=dkey(Date.now());
     if(!ui.copyFrom||ui.copyFrom===ui.fDate){ui.copyFrom=shiftDay(ui.fDate,-1);ui.copyPick=null;}
@@ -1159,10 +1238,6 @@ function openAdd(tab){
   modal(h,hd);
   if(ui.ftab==='foods')fillList('');
   if(ui.ftab==='copy')wireCopy();
-  if(ui.ftab==='code'){
-    document.getElementById('code').addEventListener('keydown',function(e){if(e.key==='Enter'){e.preventDefault();modalH.find();}});
-    document.getElementById('spOnly').addEventListener('change',function(e){ui.fSpain=e.target.checked;});
-  }
   var q=document.getElementById('q');if(q)q.addEventListener('input',function(){fillList(q.value);});
 }
 function foodForm(f){
@@ -1180,12 +1255,20 @@ function readFoodForm(old){
   f.unit=(un&&ug>0)?{name:un,g:ug}:null;return f;
 }
 function fillList(q){
-  var el=document.getElementById('flist');if(!el)return;q=q.trim().toLowerCase();
-  var list=S.food.foods.filter(function(f){return !q||f.name.toLowerCase().indexOf(q)>=0;}).map(function(f){var u=lastUse(f.id);return {f:f,t:u?u.t:0};})
+  var el=document.getElementById('flist');if(!el)return;var nq=norm(q.trim());
+  var list=S.food.foods.filter(function(f){return !nq||norm(f.name).indexOf(nq)>=0;}).map(function(f){var u=lastUse(f.id);return {f:f,t:u?u.t:0};})
     .sort(function(a,b){return ((b.f.fav?1:0)-(a.f.fav?1:0))||(b.t-a.t)||a.f.name.localeCompare(b.f.name,'es');});
-  el.innerHTML=list.map(function(o){var f=o.f,u=lastUse(f.id);
-    return '<button class="fpi" data-m="pickfood" data-id="'+f.id+'"><span class="t"><b>'+(f.fav?'★ ':'')+esc(f.name)+'</b><small>'+f0(f.kcal)+' kcal · '+mc(f)+' por 100 g'+(u?' · última vez '+f0(u.g)+' g':'')+'</small></span>'+(incomp(f)?'<span class="st">!</span>':'')+'</button>';}).join('')||
-    '<p class="mu">'+(S.food.foods.length?'Sin resultados. Crea el alimento en la pestaña Nuevo.':'Todavía no tienes alimentos. Escanea un código en la pestaña Código o crea uno en la pestaña Nuevo.')+'</p>';
+  var h=list.map(function(o){var f=o.f,u=lastUse(f.id);
+    return '<button class="fpi" data-m="pickfood" data-id="'+f.id+'"><span class="t"><b>'+(f.fav?'★ ':'')+esc(f.name)+'</b><small>'+f0(f.kcal)+' kcal · '+mc(f)+' por 100 g'+(u?' · última vez '+f0(u.g)+' g':'')+'</small></span>'+(incomp(f)?'<span class="st">!</span>':'')+'</button>';}).join('');
+  if(nq){
+    var bs=BASICS.filter(function(b){return norm(b.n).indexOf(nq)>=0&&!S.food.foods.some(function(f){return f.bid===b.id;});}).slice(0,30);
+    if(bs.length)h+='<div class="mu" style="font-size:13px;margin:12px 0 2px">Alimentos básicos</div>'+bs.map(function(b){
+      return '<button class="fpi" data-m="pickbasic" data-id="'+b.id+'"><span class="t"><b>'+esc(b.n)+'</b><small>'+f0(b.k)+' kcal · '+mc({prot:b.p,carb:b.c,fat:b.f})+' por 100 g'+(b.u?' · por unidad':'')+'</small></span></button>';}).join('');
+  }
+  if(!h)h='<p class="mu">Sin resultados. Crea el alimento en la pestaña Nuevo.</p>';
+  else if(!nq)h+='<p class="mu" style="font-size:13px;margin-top:10px">Escribe para buscar también en los alimentos básicos (huevo, pollo, arroz, fruta, verdura…). Son valores medios orientativos por 100 g.</p>';
+  if(!nq&&!S.food.foods.length)h='<p class="mu">Todavía no tienes alimentos guardados. Escribe arriba para buscar entre los alimentos básicos, escanea un código en la pestaña Código o crea uno en la pestaña Nuevo.</p>';
+  el.innerHTML=h;
 }
 function dupToday(e){return fEnt(ui.fDate).some(function(x){return x.type===e.type&&(e.refId?x.refId===e.refId:(x.name===e.name&&Math.round(x.kcal)===Math.round(e.kcal)));});}
 function cloneEntry(e){
@@ -1290,19 +1373,14 @@ function editEntry(id){
 
 /* ---------- Open Food Facts y escáner ---------- */
 function offNum(n,k){var v=n[k];if(v==null||v==='')return null;v=parseFloat(v);return isFinite(v)?v:null;}
-function parseProduct(p,code,anyName){
-  if(!p)return null;var n=p.nutriments||{};
-  var kcal=offNum(n,'energy-kcal_100g');if(kcal==null){var kj=offNum(n,'energy_100g');if(kj!=null)kcal=kj/4.184;}
-  var name=String(p.product_name||'').trim();
-  if(!name){if(!anyName)return null;name='Producto '+code;}
-  var br=Array.isArray(p.brands)?p.brands[0]:String(p.brands||'').split(',')[0];br=String(br||'').trim();
-  if(br&&name.toLowerCase().indexOf(br.toLowerCase())<0)name+=' – '+br;
-  var sq=parseFloat(p.serving_quantity);
-  return {name:name,kcal:kcal,prot:offNum(n,'proteins_100g'),carb:offNum(n,'carbohydrates_100g'),fat:offNum(n,'fat_100g'),unit:sq>0?{name:'ración',g:sq}:null,code:String(code||p.code||''),ctry:Array.isArray(p.countries_tags)?p.countries_tags:null};
-}
 function parseOFF(j,code){
   if(!j||j.status!==1||!j.product)return null;
-  return parseProduct(j.product,code,true);
+  var p=j.product,n=p.nutriments||{};
+  var kcal=offNum(n,'energy-kcal_100g');if(kcal==null){var kj=offNum(n,'energy_100g');if(kj!=null)kcal=kj/4.184;}
+  var name=String(p.product_name||'').trim()||('Producto '+code);
+  if(p.brands){var b=String(p.brands).split(',')[0].trim();if(b&&name.toLowerCase().indexOf(b.toLowerCase())<0)name+=' – '+b;}
+  var sq=parseFloat(p.serving_quantity);
+  return {name:name,kcal:kcal,prot:offNum(n,'proteins_100g'),carb:offNum(n,'carbohydrates_100g'),fat:offNum(n,'fat_100g'),unit:sq>0?{name:'ración',g:sq}:null,code:code};
 }
 var lk=null,lkFood=null;
 function runLookup(raw,hd){
@@ -1326,74 +1404,6 @@ function runLookup(raw,hd){
       document.getElementById('codeRes').innerHTML='<div class="prev"><b>'+esc(p.name)+'</b><br>Por 100 g: '+f0(p.kcal)+' kcal · '+mc(p)+(incomp(p)?'<br><span style="color:var(--wa)">Faltan datos en la ficha del producto. Puedes completarlos después en Mis alimentos.</span>':'')+'</div><button class="btn" data-m="savelk">Guardar en mis alimentos y añadir</button>';
     })
     .catch(function(){clearTimeout(to);if(document.getElementById('codeRes'))warn('No se pudo consultar Open Food Facts. Comprueba la conexión o crea el alimento a mano en la pestaña Nuevo.');});
-}
-var srT=[];
-function fetchJSON(url){
-  return new Promise(function(res,rej){
-    var ctl=typeof AbortController!=='undefined'?new AbortController():null,to=setTimeout(function(){if(ctl)ctl.abort();},8000);
-    fetch(url,ctl?{signal:ctl.signal}:{}).then(function(r){if(!r.ok)throw new Error('HTTP '+r.status);return r.json();})
-      .then(function(j){clearTimeout(to);res(j);})
-      .catch(function(e){clearTimeout(to);rej(new Error(e&&e.name==='AbortError'?'tiempo agotado':(e&&e.message)||'error'));});
-  });
-}
-function doSearch(raw,hd){
-  var q=String(raw||'').trim();
-  if(/^[\d\s-]{8,18}$/.test(q)&&q.replace(/\D/g,'').length>=8){runLookup(q,hd);return;}
-  searchName(q);
-}
-function searchName(q){
-  var box=document.getElementById('codeRes');if(!box)return;
-  function warn(t){box.innerHTML='<div class="warn" style="margin-top:12px">'+t+'</div>';}
-  if(q.length<2){warn('Escribe al menos dos letras del nombre.');return;}
-  var now=Date.now();srT=srT.filter(function(t){return now-t<60000;});
-  if(srT.length>=9){warn('Has hecho muchas búsquedas seguidas. Open Food Facts limita las búsquedas por nombre: espera un minuto.');return;}
-  box.innerHTML='<p class="mu" style="margin-top:12px">Buscando…</p>';
-  var sp=ui.fSpain!==false,enc=encodeURIComponent(q);
-  var at=[{n:'con filtro de España',u:'https://search.openfoodfacts.org/search?q='+encodeURIComponent(q+(sp?' countries_tags:"en:spain"':''))+'&page_size=24',f:false}];
-  if(sp)at.push({n:'sin filtro',u:'https://search.openfoodfacts.org/search?q='+enc+'&page_size=24',f:true});
-  function list(j){return Array.isArray(j&&j.products)?j.products:(Array.isArray(j&&j.hits)?j.hits:null);}
-  var errs=[],gotList=false,i=0;
-  function show(res){
-    ui.fres=res;
-    document.getElementById('codeRes').innerHTML='<h2 style="margin-top:14px">Resultados</h2><div class="plist" style="max-height:40vh">'+res.map(function(x,k){
-      return '<button class="fpi" data-m="pickres" data-i="'+k+'"><span class="t"><b>'+esc(x.name)+'</b><small>'+(x.kcal==null?'Sin datos de energía en la búsqueda':f0(x.kcal)+' kcal · '+mc(x)+' por 100 g')+'</small></span>'+(incomp(x)?'<span class="st">!</span>':'')+'</button>';}).join('')+'</div>';
-  }
-  function next(){
-    if(!document.getElementById('codeRes'))return;
-    if(i>=at.length){
-      if(gotList)warn('No hay resultados para «'+esc(q)+'»'+(sp?' entre los productos de España':'')+'. Open Food Facts es sobre todo de productos envasados: para alimentos sin código, como un huevo o una pechuga de pollo, crea el alimento en la pestaña Nuevo.');
-      else{
-        var md=(navigator.standalone||(window.matchMedia&&window.matchMedia('(display-mode: standalone)').matches))?'app instalada':'navegador';
-        var det=errs.join(' · ')+' · modo: '+md+' · v'+APP_VERSION;
-        var fin2=function(t){if(document.getElementById('codeRes'))warn('No se pudo buscar en Open Food Facts. Prueba con el código de barras o crea el alimento a mano en la pestaña Nuevo.<br><span style="font-size:12px;opacity:.85">Detalle técnico: '+esc(det)+' · conexión sin permisos web: '+t+'</span>');};
-        fin2('comprobando…');
-        try{fetch(at[0].u,{mode:'no-cors'}).then(function(){fin2('llega');}).catch(function(e){fin2('no llega ('+((e&&e.message)||'error')+')');});}catch(e){fin2('no se pudo probar');}
-      }
-      return;
-    }
-    var a=at[i++];srT.push(Date.now());
-    fetchJSON(a.u).then(function(j){
-      var arr=list(j);if(!arr)throw new Error('respuesta inesperada');
-      gotList=true;
-      var res=arr.map(function(p){return parseProduct(p,p.code,false);}).filter(function(x){return x&&x.code;});
-      if(a.f)res=res.filter(function(x){return !x.ctry||x.ctry.indexOf('en:spain')>=0;});
-      if(!res.length){next();return;}
-      res=res.filter(function(x){return x.kcal!=null;}).concat(res.filter(function(x){return x.kcal==null;}));
-      show(res);
-    }).catch(function(e){errs.push(a.n+': '+e.message);next();});
-  }
-  next();
-}
-function pickResult(i){
-  var p=ui.fres&&ui.fres[i];if(!p)return;
-  var mine=p.code&&S.food.foods.filter(function(f){return f.code===p.code;})[0];
-  if(mine){qtySheet('food',mine);return;}
-  function go(x){qtySheet('food',{id:uid(),name:x.name,kcal:x.kcal,prot:x.prot,carb:x.carb,fat:x.fat,unit:x.unit,fav:false,code:x.code,pending:true});}
-  if(!incomp(p)){go(p);return;}
-  toast('Cargando datos…');
-  fetchJSON('https://world.openfoodfacts.org/api/v2/product/'+p.code+'?fields=product_name,brands,nutriments,serving_quantity')
-    .then(function(j){var x=parseOFF(j,p.code);go(x&&x.kcal!=null?{name:p.name,kcal:x.kcal,prot:x.prot,carb:x.carb,fat:x.fat,unit:p.unit||x.unit,code:p.code}:p);})
-    .catch(function(){go(p);});
 }
 var scan=null,zxr=null;
 function stopScan(){
