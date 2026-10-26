@@ -1,7 +1,7 @@
 /* Service worker de Gym: la app funciona sin conexión.
    Cambia VERSION (y APP_VERSION en index.html) a la vez, con el mismo número, cada vez que publiques cambios. */
-var VERSION = 'gym-0.4';
-var FILES = ['./', 'index.html', 'manifest.webmanifest', 'icon-180.png', 'icon-192.png', 'icon-512.png'];
+var VERSION = 'gym-0.5';
+var FILES = ['./', 'index.html', 'manifest.webmanifest', 'icon-180.png', 'icon-192.png', 'icon-512.png', 'zxing.min.js'];
 
 self.addEventListener('install', function (e) {
   e.waitUntil(caches.open(VERSION).then(function (c) { return c.addAll(FILES); }).then(function () { return self.skipWaiting(); }));
