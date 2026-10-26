@@ -212,7 +212,7 @@ input:disabled{opacity:.5}
 'use strict';
 
 /* ---------- utilidades ---------- */
-var APP_VERSION='0.6.1';
+var APP_VERSION='0.6.2';
 var KEY='gymlog.v1', DAY=864e5;
 var $app=document.getElementById('app'), $tabs=document.getElementById('tabs'),
     $modal=document.getElementById('modal'), $toast=document.getElementById('toast');
@@ -1348,12 +1348,9 @@ function searchName(q){
   var now=Date.now();srT=srT.filter(function(t){return now-t<60000;});
   if(srT.length>=9){warn('Has hecho muchas búsquedas seguidas. Open Food Facts limita las búsquedas por nombre: espera un minuto.');return;}
   box.innerHTML='<p class="mu" style="margin-top:12px">Buscando…</p>';
-  var sp=ui.fSpain!==false,enc=encodeURIComponent(q),F='code,product_name,brands,nutriments,serving_quantity,countries_tags';
-  var legacy='https://world.openfoodfacts.org/cgi/search.pl?search_terms='+enc+'&search_simple=1&action=process&json=1&page_size=24&fields='+F;
-  var at=[{n:'nueva',u:'https://search.openfoodfacts.org/search?q='+encodeURIComponent(q+(sp?' countries_tags:"en:spain"':''))+'&page_size=24',f:false}];
-  if(sp)at.push({n:'nueva sin filtro',u:'https://search.openfoodfacts.org/search?q='+enc+'&page_size=24',f:true});
-  at.push({n:'clásica',u:legacy+(sp?'&tagtype_0=countries&tag_contains_0=contains&tag_0=spain':''),f:false});
-  if(sp)at.push({n:'clásica sin filtro',u:legacy,f:true});
+  var sp=ui.fSpain!==false,enc=encodeURIComponent(q);
+  var at=[{n:'con filtro de España',u:'https://search.openfoodfacts.org/search?q='+encodeURIComponent(q+(sp?' countries_tags:"en:spain"':''))+'&page_size=24',f:false}];
+  if(sp)at.push({n:'sin filtro',u:'https://search.openfoodfacts.org/search?q='+enc+'&page_size=24',f:true});
   function list(j){return Array.isArray(j&&j.products)?j.products:(Array.isArray(j&&j.hits)?j.hits:null);}
   var errs=[],gotList=false,i=0;
   function show(res){
@@ -1365,7 +1362,7 @@ function searchName(q){
     if(!document.getElementById('codeRes'))return;
     if(i>=at.length){
       if(gotList)warn('No hay resultados para «'+esc(q)+'»'+(sp?' entre los productos de España':'')+'. Open Food Facts es sobre todo de productos envasados: para alimentos sin código, como un huevo o una pechuga de pollo, crea el alimento en la pestaña Nuevo.');
-      else warn('No se pudo buscar en Open Food Facts. Prueba con el código de barras o crea el alimento a mano en la pestaña Nuevo.<br><span style="font-size:12px;opacity:.85">Detalle técnico: '+esc(errs.join(' · '))+'</span>');
+      else warn('No se pudo buscar en Open Food Facts. Prueba con el código de barras o crea el alimento a mano en la pestaña Nuevo.<br><span style="font-size:12px;opacity:.85">Detalle técnico: '+esc(errs.join(' · '))+' · modo: '+((navigator.standalone||(window.matchMedia&&window.matchMedia('(display-mode: standalone)').matches))?'app instalada':'navegador')+' · v'+APP_VERSION+'</span>');
       return;
     }
     var a=at[i++];srT.push(Date.now());
