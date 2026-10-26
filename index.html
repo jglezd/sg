@@ -212,7 +212,7 @@ input:disabled{opacity:.5}
 'use strict';
 
 /* ---------- utilidades ---------- */
-var APP_VERSION='0.6.2';
+var APP_VERSION='0.6.3';
 var KEY='gymlog.v1', DAY=864e5;
 var $app=document.getElementById('app'), $tabs=document.getElementById('tabs'),
     $modal=document.getElementById('modal'), $toast=document.getElementById('toast');
@@ -1362,7 +1362,13 @@ function searchName(q){
     if(!document.getElementById('codeRes'))return;
     if(i>=at.length){
       if(gotList)warn('No hay resultados para «'+esc(q)+'»'+(sp?' entre los productos de España':'')+'. Open Food Facts es sobre todo de productos envasados: para alimentos sin código, como un huevo o una pechuga de pollo, crea el alimento en la pestaña Nuevo.');
-      else warn('No se pudo buscar en Open Food Facts. Prueba con el código de barras o crea el alimento a mano en la pestaña Nuevo.<br><span style="font-size:12px;opacity:.85">Detalle técnico: '+esc(errs.join(' · '))+' · modo: '+((navigator.standalone||(window.matchMedia&&window.matchMedia('(display-mode: standalone)').matches))?'app instalada':'navegador')+' · v'+APP_VERSION+'</span>');
+      else{
+        var md=(navigator.standalone||(window.matchMedia&&window.matchMedia('(display-mode: standalone)').matches))?'app instalada':'navegador';
+        var det=errs.join(' · ')+' · modo: '+md+' · v'+APP_VERSION;
+        var fin2=function(t){if(document.getElementById('codeRes'))warn('No se pudo buscar en Open Food Facts. Prueba con el código de barras o crea el alimento a mano en la pestaña Nuevo.<br><span style="font-size:12px;opacity:.85">Detalle técnico: '+esc(det)+' · conexión sin permisos web: '+t+'</span>');};
+        fin2('comprobando…');
+        try{fetch(at[0].u,{mode:'no-cors'}).then(function(){fin2('llega');}).catch(function(e){fin2('no llega ('+((e&&e.message)||'error')+')');});}catch(e){fin2('no se pudo probar');}
+      }
       return;
     }
     var a=at[i++];srT.push(Date.now());
