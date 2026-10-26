@@ -212,7 +212,7 @@ input:disabled{opacity:.5}
 'use strict';
 
 /* ---------- utilidades ---------- */
-var APP_VERSION='0.6';
+var APP_VERSION='0.6.1';
 var KEY='gymlog.v1', DAY=864e5;
 var $app=document.getElementById('app'), $tabs=document.getElementById('tabs'),
     $modal=document.getElementById('modal'), $toast=document.getElementById('toast');
@@ -1298,7 +1298,7 @@ function parseProduct(p,code,anyName){
   var br=Array.isArray(p.brands)?p.brands[0]:String(p.brands||'').split(',')[0];br=String(br||'').trim();
   if(br&&name.toLowerCase().indexOf(br.toLowerCase())<0)name+=' – '+br;
   var sq=parseFloat(p.serving_quantity);
-  return {name:name,kcal:kcal,prot:offNum(n,'proteins_100g'),carb:offNum(n,'carbohydrates_100g'),fat:offNum(n,'fat_100g'),unit:sq>0?{name:'ración',g:sq}:null,code:String(code||p.code||'')};
+  return {name:name,kcal:kcal,prot:offNum(n,'proteins_100g'),carb:offNum(n,'carbohydrates_100g'),fat:offNum(n,'fat_100g'),unit:sq>0?{name:'ración',g:sq}:null,code:String(code||p.code||''),ctry:Array.isArray(p.countries_tags)?p.countries_tags:null};
 }
 function parseOFF(j,code){
   if(!j||j.status!==1||!j.product)return null;
@@ -1330,8 +1330,10 @@ function runLookup(raw,hd){
 var srT=[];
 function fetchJSON(url){
   return new Promise(function(res,rej){
-    var ctl=typeof AbortController!=='undefined'?new AbortController():null,to=setTimeout(function(){if(ctl)ctl.abort();},10000);
-    fetch(url,ctl?{signal:ctl.signal}:{}).then(function(r){if(!r.ok)throw new Error('http');return r.json();}).then(function(j){clearTimeout(to);res(j);}).catch(function(e){clearTimeout(to);rej(e);});
+    var ctl=typeof AbortController!=='undefined'?new AbortController():null,to=setTimeout(function(){if(ctl)ctl.abort();},8000);
+    fetch(url,ctl?{signal:ctl.signal}:{}).then(function(r){if(!r.ok)throw new Error('HTTP '+r.status);return r.json();})
+      .then(function(j){clearTimeout(to);res(j);})
+      .catch(function(e){clearTimeout(to);rej(new Error(e&&e.name==='AbortError'?'tiempo agotado':(e&&e.message)||'error'));});
   });
 }
 function doSearch(raw,hd){
@@ -1344,29 +1346,51 @@ function searchName(q){
   function warn(t){box.innerHTML='<div class="warn" style="margin-top:12px">'+t+'</div>';}
   if(q.length<2){warn('Escribe al menos dos letras del nombre.');return;}
   var now=Date.now();srT=srT.filter(function(t){return now-t<60000;});
-  if(srT.length>=8){warn('Has hecho muchas búsquedas seguidas. Open Food Facts limita las búsquedas por nombre: espera un minuto.');return;}
-  srT.push(now);
+  if(srT.length>=9){warn('Has hecho muchas búsquedas seguidas. Open Food Facts limita las búsquedas por nombre: espera un minuto.');return;}
   box.innerHTML='<p class="mu" style="margin-top:12px">Buscando…</p>';
-  var sp=ui.fSpain!==false,enc=encodeURIComponent(q),F='code,product_name,brands,nutriments,serving_quantity';
-  var u1='https://world.openfoodfacts.org/cgi/search.pl?search_terms='+enc+'&search_simple=1&action=process&json=1&page_size=24&fields='+F+(sp?'&tagtype_0=countries&tag_contains_0=contains&tag_0=spain':'');
-  var u2='https://search.openfoodfacts.org/search?q='+encodeURIComponent(q+(sp?' countries_tags:"en:spain"':''))+'&page_size=24&fields='+F;
+  var sp=ui.fSpain!==false,enc=encodeURIComponent(q),F='code,product_name,brands,nutriments,serving_quantity,countries_tags';
+  var legacy='https://world.openfoodfacts.org/cgi/search.pl?search_terms='+enc+'&search_simple=1&action=process&json=1&page_size=24&fields='+F;
+  var at=[{n:'nueva',u:'https://search.openfoodfacts.org/search?q='+encodeURIComponent(q+(sp?' countries_tags:"en:spain"':''))+'&page_size=24',f:false}];
+  if(sp)at.push({n:'nueva sin filtro',u:'https://search.openfoodfacts.org/search?q='+enc+'&page_size=24',f:true});
+  at.push({n:'clásica',u:legacy+(sp?'&tagtype_0=countries&tag_contains_0=contains&tag_0=spain':''),f:false});
+  if(sp)at.push({n:'clásica sin filtro',u:legacy,f:true});
   function list(j){return Array.isArray(j&&j.products)?j.products:(Array.isArray(j&&j.hits)?j.hits:null);}
-  fetchJSON(u1).then(function(j){if(!list(j))throw new Error('formato');return j;}).catch(function(){return fetchJSON(u2);}).then(function(j){
-    if(!document.getElementById('codeRes'))return;
-    var arr=list(j);if(!arr)throw new Error('formato');
-    var res=arr.map(function(p){return parseProduct(p,p.code,false);}).filter(function(x){return x&&x.code;});
-    res=res.filter(function(x){return x.kcal!=null;}).concat(res.filter(function(x){return x.kcal==null;}));
+  var errs=[],gotList=false,i=0;
+  function show(res){
     ui.fres=res;
-    if(!res.length){warn('No hay resultados para «'+esc(q)+'»'+(sp?' entre los productos de España. Prueba a quitar el filtro de España':'')+'. También puedes crear el alimento a mano en la pestaña Nuevo.');return;}
-    document.getElementById('codeRes').innerHTML='<h2 style="margin-top:14px">Resultados</h2><div class="plist" style="max-height:40vh">'+res.map(function(x,i){
-      return '<button class="fpi" data-m="pickres" data-i="'+i+'"><span class="t"><b>'+esc(x.name)+'</b><small>'+(x.kcal==null?'Sin datos de energía':f0(x.kcal)+' kcal · '+mc(x)+' por 100 g')+'</small></span>'+(incomp(x)?'<span class="st">!</span>':'')+'</button>';}).join('')+'</div>';
-  }).catch(function(){if(document.getElementById('codeRes'))warn('No se pudo buscar en Open Food Facts: puede faltar conexión o la búsqueda no estar disponible. Prueba con el código de barras o crea el alimento a mano en la pestaña Nuevo.');});
+    document.getElementById('codeRes').innerHTML='<h2 style="margin-top:14px">Resultados</h2><div class="plist" style="max-height:40vh">'+res.map(function(x,k){
+      return '<button class="fpi" data-m="pickres" data-i="'+k+'"><span class="t"><b>'+esc(x.name)+'</b><small>'+(x.kcal==null?'Sin datos de energía en la búsqueda':f0(x.kcal)+' kcal · '+mc(x)+' por 100 g')+'</small></span>'+(incomp(x)?'<span class="st">!</span>':'')+'</button>';}).join('')+'</div>';
+  }
+  function next(){
+    if(!document.getElementById('codeRes'))return;
+    if(i>=at.length){
+      if(gotList)warn('No hay resultados para «'+esc(q)+'»'+(sp?' entre los productos de España':'')+'. Open Food Facts es sobre todo de productos envasados: para alimentos sin código, como un huevo o una pechuga de pollo, crea el alimento en la pestaña Nuevo.');
+      else warn('No se pudo buscar en Open Food Facts. Prueba con el código de barras o crea el alimento a mano en la pestaña Nuevo.<br><span style="font-size:12px;opacity:.85">Detalle técnico: '+esc(errs.join(' · '))+'</span>');
+      return;
+    }
+    var a=at[i++];srT.push(Date.now());
+    fetchJSON(a.u).then(function(j){
+      var arr=list(j);if(!arr)throw new Error('respuesta inesperada');
+      gotList=true;
+      var res=arr.map(function(p){return parseProduct(p,p.code,false);}).filter(function(x){return x&&x.code;});
+      if(a.f)res=res.filter(function(x){return !x.ctry||x.ctry.indexOf('en:spain')>=0;});
+      if(!res.length){next();return;}
+      res=res.filter(function(x){return x.kcal!=null;}).concat(res.filter(function(x){return x.kcal==null;}));
+      show(res);
+    }).catch(function(e){errs.push(a.n+': '+e.message);next();});
+  }
+  next();
 }
 function pickResult(i){
   var p=ui.fres&&ui.fres[i];if(!p)return;
   var mine=p.code&&S.food.foods.filter(function(f){return f.code===p.code;})[0];
   if(mine){qtySheet('food',mine);return;}
-  qtySheet('food',{id:uid(),name:p.name,kcal:p.kcal,prot:p.prot,carb:p.carb,fat:p.fat,unit:p.unit,fav:false,code:p.code,pending:true});
+  function go(x){qtySheet('food',{id:uid(),name:x.name,kcal:x.kcal,prot:x.prot,carb:x.carb,fat:x.fat,unit:x.unit,fav:false,code:x.code,pending:true});}
+  if(!incomp(p)){go(p);return;}
+  toast('Cargando datos…');
+  fetchJSON('https://world.openfoodfacts.org/api/v2/product/'+p.code+'?fields=product_name,brands,nutriments,serving_quantity')
+    .then(function(j){var x=parseOFF(j,p.code);go(x&&x.kcal!=null?{name:p.name,kcal:x.kcal,prot:x.prot,carb:x.carb,fat:x.fat,unit:p.unit||x.unit,code:p.code}:p);})
+    .catch(function(){go(p);});
 }
 var scan=null,zxr=null;
 function stopScan(){
